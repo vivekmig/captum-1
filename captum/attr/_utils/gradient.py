@@ -74,6 +74,7 @@ def compute_gradients(
     inputs: Union[Tensor, Tuple[Tensor, ...]],
     target_ind: TargetType = None,
     additional_forward_args: Any = None,
+    get_outputs = False,
 ) -> Tuple[Tensor, ...]:
     r"""
         Computes gradients of the output with respect to inputs for an
@@ -101,6 +102,8 @@ def compute_gradients(
         # torch.unbind(forward_out) is a list of scalar tensor tuples and
         # contains batch_size * #steps elements
         grads = torch.autograd.grad(torch.unbind(outputs), inputs)
+    if get_outputs:
+        return grads, outputs
     return grads
 
 
