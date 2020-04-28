@@ -80,6 +80,11 @@ def _batch_attribution(
         else:
             if isinstance(total_attr, Tensor):
                 total_attr = total_attr + current_attr
+            elif isinstance(total_attr, tuple) and len(total_attr) == 4:
+                total_attr = tuple(
+                    torch.cat((prev_total, current))
+                    for prev_total, current in zip(total_attr, current_attr)
+                )
             else:
                 total_attr = tuple(
                     current + prev_total

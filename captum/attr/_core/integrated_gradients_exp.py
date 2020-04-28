@@ -322,11 +322,11 @@ class IntegratedGradientsExp(GradientAttribution):
             inputs=scaled_features_tpl,
             target_ind=expanded_target,
             additional_forward_args=input_additional_args,
-            get_outputs = True,
+            get_outputs=True,
         )
         steps = torch.tensor(step_sizes).view(n_steps, 1)
-        
-        return grads, outputs, steps, scaled_features_tpl
+
+        return grads[0], outputs, steps, scaled_features_tpl[0]
 
     def has_convergence_delta(self) -> bool:
         return True
