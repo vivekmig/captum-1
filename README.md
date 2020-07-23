@@ -12,12 +12,12 @@ The experiments which use this to compute Split IG and experiment with this tech
 
 ## Article and BibTex
 
-Here is an article describing SplitIG and initial results on ImageNet classification models. The article is accepted to the [WHI Workshop @ICML 2020](https://sites.google.com/view/whi2020).
+[Here](http://whi2020.online/static/pdfs/paper_66.pdf) is an article describing SplitIG and initial results on ImageNet classification models. The article is accepted to the [WHI Workshop @ICML 2020](https://sites.google.com/view/whi2020).
 
 You can cite the article as follows:
 <br/>
 ```
-@inproceedings{whi2020visualizing,
+@inproceedings{whi2020investigating,
   title={Investigating Saturation Effects in Integrated Gradients},
   author={Vivek Miglani and Narine Kokhlikyan and Bilal Alsallakh and Miguel Martin and Reblitz-Richardson, Orion},
   booktitle={ICML Workshop on Human Interpretability in Machine Learning (WHI)},
