@@ -5,27 +5,30 @@
 
 # This notebook loads pretrained CNN model for sentiment analysis on IMDB dataset. It makes predictions on test samples and interprets those predictions using integrated gradients method.
 # 
-# The model was trained using an open source sentiment analysis tutorials described in: https://github.com/bentrevett/pytorch-sentiment-analysis/blob/master/4%20-%20Convolutional%20Sentiment%20Analysis.ipynb
-#   
-#   **Note:** Before running this tutorial, please install the spacy package, and its NLP modules for English language.
+# The model was trained using an open source sentiment analysis tutorials described in: https://github.com/bentrevett/pytorch-sentiment-analysis/blob/master/4%20-%20Convolutional%20Sentiment%20Analysis.ipynb with the following changes:
+# 
+# - TEXT: set lower=True at initialization and call build_vocab() on the entire training data including validation to avoid mismatched indices
+# - model: save the entire model instead of just model.state_dict()
+# 
+# **Note:** Before running this tutorial, please install the spacy package, and its NLP modules for English language.
 
 # In[1]:
 
+
+import captum
 
 import spacy
 
 import torch
 import torchtext
 import torchtext.data
+
 import torch.nn as nn
 import torch.nn.functional as F
 
 from torchtext.vocab import Vocab
 
-from captum.attr import IntegratedGradients
-from captum.attr import InterpretableEmbeddingBase, TokenReferenceBase
-from captum.attr import visualization
-from captum.attr import configure_interpretable_embedding_layer, remove_interpretable_embedding_layer
+from captum.attr import LayerIntegratedGradients, TokenReferenceBase, visualization
 
 nlp = spacy.load('en')
 
@@ -33,7 +36,14 @@ nlp = spacy.load('en')
 # In[2]:
 
 
-device = torch.device("cuda:5" if torch.cuda.is_available() else "cpu")
+for package in (captum, spacy, torch, torchtext):
+    print(package.__name__, package.__version__)
+
+
+# In[ ]:
+
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 # The dataset used for training this model can be found in: https://ai.stanford.edu/~amaas/data/sentiment/
@@ -41,7 +51,7 @@ device = torch.device("cuda:5" if torch.cuda.is_available() else "cpu")
 # Redefining the model in order to be able to load it.
 # 
 
-# In[3]:
+# In[4]:
 
 
 class CNN(nn.Module):
@@ -72,7 +82,7 @@ class CNN(nn.Module):
         #text = [batch size, sent len]
         
         embedded = self.embedding(text)
-                
+
         #embedded = [batch size, sent len, emb dim]
         
         embedded = embedded.unsqueeze(1)
@@ -94,18 +104,21 @@ class CNN(nn.Module):
         return self.fc(cat)
 
 
-# Loads pretrained model and sets the model to eval mode
+# Loads pretrained model and sets the model to eval mode.
+# 
+# The model can be downloaded here: https://github.com/pytorch/captum/blob/master/tutorials/models/imdb-model-cnn-large.pt
 
 # In[ ]:
 
 
-model = torch.load('models/imdb-model-cnn.pt')
+model = torch.load('models/imdb-model-cnn-large.pt')
 model.eval()
+model = model.to(device)
 
 
 # Forward function that supports sigmoid
 
-# In[5]:
+# In[6]:
 
 
 def forward_with_sigmoid(input):
@@ -114,87 +127,83 @@ def forward_with_sigmoid(input):
 
 # Load a small subset of test data using torchtext from IMDB dataset.
 
-# In[6]:
+# In[ ]:
 
 
 TEXT = torchtext.data.Field(lower=True, tokenize='spacy')
 Label = torchtext.data.LabelField(dtype = torch.float)
 
 
-# In[7]:
+# In[ ]:
 
 
+# If you use torchtext version >= 0.9, make sure to access train and test splits with:
+# train, test = IMDB(tokenizer=get_tokenizer("spacy"))
 train, test = torchtext.datasets.IMDB.splits(text_field=TEXT,
                                       label_field=Label,
                                       train='train',
                                       test='test',
                                       path='data/aclImdb')
+
+
 test, _ = test.split(split_ratio = 0.04)
 
 
 # Loading and setting up vocabulary for word embeddings using torchtext.
 
-# In[8]:
+# In[9]:
 
 
 from torchtext import vocab
 
-#loaded_vectors = vocab.GloVe(name='6B', dim=50)
+#loaded_vectors = vocab.GloVe(name='6B', dim=100)
 
 # If you prefer to use pre-downloaded glove vectors, you can load them with the following two command line
-loaded_vectors = torchtext.vocab.Vectors('data/glove.6B.50d.txt')
+loaded_vectors = torchtext.vocab.Vectors('data/glove.6B.100d.txt')
 TEXT.build_vocab(train, vectors=loaded_vectors, max_size=len(loaded_vectors.stoi))
     
 TEXT.vocab.set_vectors(stoi=loaded_vectors.stoi, vectors=loaded_vectors.vectors, dim=loaded_vectors.dim)
 Label.build_vocab(train)
 
 
-# In[9]:
+# In[10]:
 
 
 print('Vocabulary Size: ', len(TEXT.vocab))
 
 
-# In[10]:
-
-
-PAD_IND = TEXT.vocab.stoi['pad']
-
-
 # In order to apply Integrated Gradients and many other interpretability algorithms on sentences, we need to create a reference (aka baseline) for the sentences and its constituent parts, tokens.
 # 
-# Captum provides a helper class called `TokenReferenceBase` which allows us to generate a reference for each input text using the number of tokens in the text and a reference token index. 
+# Captum provides a helper class called `TokenReferenceBase` which allows us to generate a reference for each input text using the number of tokens in the text and a reference token index.
 # 
 # To use `TokenReferenceBase` we need to provide a `reference_token_idx`. Since padding is one of the most commonly used references for tokens, padding index is passed as reference token index.
 
 # In[11]:
 
 
+PAD_IND = TEXT.vocab.stoi[TEXT.pad_token]
+
+
+# In[12]:
+
+
 token_reference = TokenReferenceBase(reference_token_idx=PAD_IND)
 
 
-# In order to explain text features, we introduce interpretable embedding layers which will allow us to access word embeddings and generate meaningful attributions for each embedding dimension.
+# Let's create an instance of `LayerIntegratedGradients` using forward function of our model and the embedding layer.
+# This instance of layer integrated gradients will be used to interpret movie rating review.
 # 
-# `configure_interpretable_embedding_layer` function separates embedding layer from the model and precomputes word embeddings in advance. The embedding layer of our model is then being replaced by an Interpretable Embedding Layer which wraps original embedding layer and takes word embedding vectors as inputs of the forward function. This allows us to generate baselines for word embeddings and compute attributions for each embedding dimension.
+# Layer Integrated Gradients will allow us to assign an attribution score to each word/token embedding tensor in the movie review text. We will ultimately sum the attribution scores across all embedding dimensions for each word/token in order to attain a word/token level attribution score.
 # 
-# Note: After finishing interpretation it is important to call `remove_interpretable_embedding_layer` which removes the Interpretable Embedding Layer that we added for interpretation purposes and sets the original embedding layer back in the model.
-
-# In[ ]:
-
-
-interpretable_embedding = configure_interpretable_embedding_layer(model, 'embedding')
-
-
-# Creates an instance of IntegratedGradients using forward function of our model.
-# This instance of integrated gradients will be used to interpret movie rating review.
+# Note that we can also use `IntegratedGradients` class instead, however in that case we need to precompute the embeddings and wrap Embedding layer with `InterpretableEmbeddingBase` module. This is necessary because we cannot perform input scaling and subtraction on the level of word/token indices and need access to the embedding layer.
 
 # In[13]:
 
 
-ig = IntegratedGradients(model)
+lig = LayerIntegratedGradients(model, model.embedding)
 
 
-# In the cell below, we define a generic function that generates attributions for each movie rating and adds it to a list of `VisualizationDataRecord`s and prepares them for visualization.
+# In the cell below, we define a generic function that generates attributions for each movie rating and stores them in a list using `VisualizationDataRecord` class. This will ultimately be used for visualization purposes.
 
 # In[14]:
 
@@ -203,34 +212,28 @@ ig = IntegratedGradients(model)
 vis_data_records_ig = []
 
 def interpret_sentence(model, sentence, min_len = 7, label = 0):
-    model.eval()
-    text = [tok.text for tok in nlp.tokenizer(sentence)]
+    text = [tok.text for tok in nlp.tokenizer(sentence.lower())]
     if len(text) < min_len:
-        text += ['pad'] * (min_len - len(text))
+        text += [TEXT.pad_token] * (min_len - len(text))
     indexed = [TEXT.vocab.stoi[t] for t in text]
 
-    
     model.zero_grad()
 
-    input_indices = torch.LongTensor(indexed)
+    input_indices = torch.tensor(indexed, device=device)
     input_indices = input_indices.unsqueeze(0)
     
     # input_indices dim: [sequence_length]
     seq_length = min_len
 
-    # pre-computing word embeddings
-    input_embedding = interpretable_embedding.indices_to_embeddings(input_indices)
-
     # predict
-    pred = forward_with_sigmoid(input_embedding).item()
+    pred = forward_with_sigmoid(input_indices).item()
     pred_ind = round(pred)
 
-    # generate reference for each sample
+    # generate reference indices for each sample
     reference_indices = token_reference.generate_reference(seq_length, device=device).unsqueeze(0)
-    reference_embedding = interpretable_embedding.indices_to_embeddings(reference_indices)
 
-    # compute attributions and approximation delta using integrated gradients
-    attributions_ig, delta = ig.attribute(input_embedding, reference_embedding, n_steps=500, return_convergence_delta=True)
+    # compute attributions and approximation delta using layer integrated gradients
+    attributions_ig, delta = lig.attribute(input_indices, reference_indices,                                            n_steps=500, return_convergence_delta=True)
 
     print('pred: ', Label.vocab.itos[pred_ind], '(', '%.2f'%pred, ')', ', delta: ', abs(delta))
 
@@ -239,7 +242,7 @@ def interpret_sentence(model, sentence, min_len = 7, label = 0):
 def add_attributions_to_visualizer(attributions, text, pred, pred_ind, label, delta, vis_data_records):
     attributions = attributions.sum(dim=2).squeeze(0)
     attributions = attributions / torch.norm(attributions)
-    attributions = attributions.detach().numpy()
+    attributions = attributions.cpu().detach().numpy()
 
     # storing couple samples in an array for visualization purposes
     vis_data_records.append(visualization.VisualizationDataRecord(
@@ -248,8 +251,8 @@ def add_attributions_to_visualizer(attributions, text, pred, pred_ind, label, de
                             Label.vocab.itos[pred_ind],
                             Label.vocab.itos[label],
                             Label.vocab.itos[1],
-                            attributions.sum(),       
-                            text[:len(attributions)],
+                            attributions.sum(),
+                            text,
                             delta))
 
 
@@ -263,7 +266,7 @@ interpret_sentence(model, 'Best film ever', label=1)
 interpret_sentence(model, 'Such a great show!', label=1)
 interpret_sentence(model, 'It was a horrible movie', label=0)
 interpret_sentence(model, 'I\'ve never watched something as bad', label=0)
-interpret_sentence(model, 'It is a disgusting movie!', label=0)
+interpret_sentence(model, 'That is a terrible movie.', label=0)
 
 
 # Below is an example of how we can visualize attributions for the text tokens. Feel free to visualize it differently if you choose to have a different visualization method.
@@ -272,7 +275,7 @@ interpret_sentence(model, 'It is a disgusting movie!', label=0)
 
 
 print('Visualize attributions based on Integrated Gradients')
-visualization.visualize_text(vis_data_records_ig)
+_ = visualization.visualize_text(vis_data_records_ig)
 
 
 # Above cell generates an output similar to this:
@@ -282,12 +285,4 @@ visualization.visualize_text(vis_data_records_ig)
 
 from IPython.display import Image
 Image(filename='img/sentiment_analysis.png')
-
-
-# As mentioned above, after we are done with interpretation, we have to remove Interpretable Embedding Layer and set the original embeddings layer back to the model.
-
-# In[18]:
-
-
-remove_interpretable_embedding_layer(model, interpretable_embedding)
 

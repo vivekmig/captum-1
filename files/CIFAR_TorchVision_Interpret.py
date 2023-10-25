@@ -105,7 +105,7 @@ optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
 
 
 # Trains `Net` model for a very small number of epochs. The training code snippet is copied from the tutorial mentioned above. 
-# In order to avoid training the model every time from scratch, we save a pretrained version of the model in `models` folder and load it from there.
+# In order to avoid training the model every time from scratch, we save a pretrained version of the model in `models` folder and load it from there. https://github.com/pytorch/captum/blob/master/tutorials/models/cifar_torchvision.pt
 
 # In[5]:
 
@@ -148,7 +148,7 @@ else:
 
 
 
-def imshow(img, transpose = True):
+def imshow(img):
     img = img / 2 + 0.5     # unnormalize
     npimg = img.numpy()
     plt.imshow(np.transpose(npimg, (1, 2, 0)))
@@ -226,7 +226,7 @@ attr_ig = np.transpose(attr_ig.squeeze().cpu().detach().numpy(), (1, 2, 0))
 print('Approximation delta: ', abs(delta))
 
 
-# Below we demonstrate how to use integrated gradients and noise tunnel with smoothgrad square option on the test image. Noise tunnel with `smoothgrad square` option adds gaussian noise with a standard deviation of `stdevs=0.2` to the input image `n_samples` times, computes the attributions for `n_samples` images and returns the mean of the squared attributions across `n_samples` images.
+# Below we demonstrate how to use integrated gradients and noise tunnel with smoothgrad square option on the test image. Noise tunnel with `smoothgrad square` option adds gaussian noise with a standard deviation of `stdevs=0.2` to the input image `nt_samples` times, computes the attributions for `nt_samples` images and returns the mean of the squared attributions across `nt_samples` images.
 
 # In[12]:
 
@@ -234,7 +234,7 @@ print('Approximation delta: ', abs(delta))
 ig = IntegratedGradients(net)
 nt = NoiseTunnel(ig)
 attr_ig_nt = attribute_image_features(nt, input, baselines=input * 0, nt_type='smoothgrad_sq',
-                                      n_samples=100, stdevs=0.2)
+                                      nt_samples=100, stdevs=0.2)
 attr_ig_nt = np.transpose(attr_ig_nt.squeeze(0).cpu().detach().numpy(), (1, 2, 0))
 
 
