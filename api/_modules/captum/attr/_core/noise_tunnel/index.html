@@ -224,9 +224,13 @@ src="/_sphinx/documentation_options.js"></script>
                 <span class="p">),</span> <span class="s2">"stdevs must be type float. "</span> <span class="s2">"Given: </span><span class="si">{}</span><span class="s2">"</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">stdevs</span><span class="p">))</span>
                 <span class="n">stdevs_</span> <span class="o">=</span> <span class="p">(</span><span class="n">stdevs</span><span class="p">,)</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
             <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span>
-                <span class="n">add_noise_to_input</span><span class="p">(</span><span class="nb">input</span><span class="p">,</span> <span class="n">stdev</span><span class="p">,</span> <span class="n">nt_samples_partition</span><span class="p">)</span><span class="o">.</span><span class="n">requires_grad_</span><span class="p">()</span>
-                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_gradient_method</span>
-                <span class="k">else</span> <span class="n">add_noise_to_input</span><span class="p">(</span><span class="nb">input</span><span class="p">,</span> <span class="n">stdev</span><span class="p">,</span> <span class="n">nt_samples_partition</span><span class="p">)</span>
+                <span class="p">(</span>
+                    <span class="n">add_noise_to_input</span><span class="p">(</span>
+                        <span class="nb">input</span><span class="p">,</span> <span class="n">stdev</span><span class="p">,</span> <span class="n">nt_samples_partition</span>
+                    <span class="p">)</span><span class="o">.</span><span class="n">requires_grad_</span><span class="p">()</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_gradient_method</span>
+                    <span class="k">else</span> <span class="n">add_noise_to_input</span><span class="p">(</span><span class="nb">input</span><span class="p">,</span> <span class="n">stdev</span><span class="p">,</span> <span class="n">nt_samples_partition</span><span class="p">)</span>
+                <span class="p">)</span>
                 <span class="k">for</span> <span class="p">(</span><span class="nb">input</span><span class="p">,</span> <span class="n">stdev</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="n">stdevs_</span><span class="p">)</span>
             <span class="p">)</span>
 
@@ -288,9 +292,11 @@ src="/_sphinx/documentation_options.js"></script>
 
             <span class="n">attributions</span> <span class="o">=</span> <span class="n">attr_func</span><span class="o">.</span><span class="n">__wrapped__</span><span class="p">(</span>  <span class="c1"># type: ignore</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">attribution_method</span><span class="p">,</span>  <span class="c1"># self</span>
-                <span class="n">inputs_with_noise_partition</span>
-                <span class="k">if</span> <span class="n">is_inputs_tuple</span>
-                <span class="k">else</span> <span class="n">inputs_with_noise_partition</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                <span class="p">(</span>
+                    <span class="n">inputs_with_noise_partition</span>
+                    <span class="k">if</span> <span class="n">is_inputs_tuple</span>
+                    <span class="k">else</span> <span class="n">inputs_with_noise_partition</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="p">),</span>
                 <span class="o">**</span><span class="n">kwargs_partition</span><span class="p">,</span>
             <span class="p">)</span>
             <span class="n">delta</span> <span class="o">=</span> <span class="kc">None</span>
@@ -541,7 +547,7 @@ src="/_sphinx/documentation_options.js"></script>
 </div>
 </div>
 <div class="clearer"></div>
-</div></div></div><footer class="nav-footer" id="footer"><section class="sitemap"><div class="footerSection"><h5>Docs</h5><a href="/docs/introduction">Introduction</a><a href="/docs/getting_started">Getting Started</a><a href="/tutorials/">Tutorials</a><a href="/api/">API Reference</a></div><div class="footerSection"><h5>Legal</h5><a href="https://opensource.facebook.com/legal/privacy/" target="_blank" rel="noreferrer noopener">Privacy</a><a href="https://opensource.facebook.com/legal/terms/" target="_blank" rel="noreferrer noopener">Terms</a></div><div class="footerSection"><h5>Social</h5><div class="social"><a class="github-button" href="https://github.com/pytorch/captum" data-count-href="https://github.com/pytorch/captum/stargazers" data-show-count="true" data-count-aria-label="# stargazers on GitHub" aria-label="Star Captum on GitHub">captum</a></div></div></section><a href="https://opensource.facebook.com/" target="_blank" rel="noreferrer noopener" class="fbOpenSource"><img src="/img/oss_logo.png" alt="Facebook Open Source" width="170" height="45"/></a><section class="copyright"> Copyright © 2023 Facebook Inc.</section><script>
+</div></div></div><footer class="nav-footer" id="footer"><section class="sitemap"><div class="footerSection"><h5>Docs</h5><a href="/docs/introduction">Introduction</a><a href="/docs/getting_started">Getting Started</a><a href="/tutorials/">Tutorials</a><a href="/api/">API Reference</a></div><div class="footerSection"><h5>Legal</h5><a href="https://opensource.facebook.com/legal/privacy/" target="_blank" rel="noreferrer noopener">Privacy</a><a href="https://opensource.facebook.com/legal/terms/" target="_blank" rel="noreferrer noopener">Terms</a></div><div class="footerSection"><h5>Social</h5><div class="social"><a class="github-button" href="https://github.com/pytorch/captum" data-count-href="https://github.com/pytorch/captum/stargazers" data-show-count="true" data-count-aria-label="# stargazers on GitHub" aria-label="Star Captum on GitHub">captum</a></div></div></section><a href="https://opensource.facebook.com/" target="_blank" rel="noreferrer noopener" class="fbOpenSource"><img src="/img/oss_logo.png" alt="Facebook Open Source" width="170" height="45"/></a><section class="copyright"> Copyright © 2024 Facebook Inc.</section><script>
             (function() {
               var BAD_BASE = '/captum/';
               if (window.location.origin !== 'https://captum.ai') {

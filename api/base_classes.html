@@ -40,7 +40,7 @@ src="/_sphinx/documentation_options.js"></script>
 to extend and override core <cite>attribute</cite> method.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>forward_func</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.12)"><em>Callable</em></a><em> or </em><a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.1)"><em>torch.nn.Module</em></a>) – This can either be an instance
+<dd class="field-odd"><p><strong>forward_func</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.12)"><em>Callable</em></a><em> or </em><a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.2)"><em>torch.nn.Module</em></a>) – This can either be an instance
 of pytorch model or any modification of model’s forward
 function.</p>
 </dd>
@@ -54,7 +54,7 @@ Deriving classes are responsible for implementing its logic accordingly.</p>
 arguments.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>inputs</strong> (<a class="reference external" href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.1)"><em>Tensor</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.12)"><em>tuple</em></a><em>[</em><a class="reference external" href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.1)"><em>Tensor</em></a><em>, </em><em>...</em><em>]</em>) – Input for which attribution
+<dd class="field-odd"><p><strong>inputs</strong> (<a class="reference external" href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.2)"><em>Tensor</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.12)"><em>tuple</em></a><em>[</em><a class="reference external" href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.2)"><em>Tensor</em></a><em>, </em><em>...</em><em>]</em>) – Input for which attribution
 is computed. It can be provided as a single tensor or
 a tuple of multiple tensors. If multiple input tensors
 are provided, the batch sizes must be aligned across all
@@ -90,7 +90,7 @@ attribution alogrithms.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>attributions</strong> (<a class="reference external" href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.1)"><em>Tensor</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.12)"><em>tuple</em></a><em>[</em><a class="reference external" href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.1)"><em>Tensor</em></a><em>, </em><em>...</em><em>]</em>) – Attribution scores that
+<li><p><strong>attributions</strong> (<a class="reference external" href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.2)"><em>Tensor</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.12)"><em>tuple</em></a><em>[</em><a class="reference external" href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.2)"><em>Tensor</em></a><em>, </em><em>...</em><em>]</em>) – Attribution scores that
 are precomputed by an attribution algorithm.
 Attributions can be provided in form of a single tensor
 or a tuple of those. It is assumed that attribution
@@ -171,10 +171,10 @@ the size of the layer output.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>forward_func</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.12)"><em>Callable</em></a><em> or </em><a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.1)"><em>torch.nn.Module</em></a>) – This can either be an instance
+<li><p><strong>forward_func</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.12)"><em>Callable</em></a><em> or </em><a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.2)"><em>torch.nn.Module</em></a>) – This can either be an instance
 of pytorch model or any modification of model’s forward
 function.</p></li>
-<li><p><strong>layer</strong> (<a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.1)"><em>torch.nn.Module</em></a>) – Layer for which output attributions are computed.
+<li><p><strong>layer</strong> (<a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.2)"><em>torch.nn.Module</em></a>) – Layer for which output attributions are computed.
 Output size of attribute matches that of layer output.</p></li>
 <li><p><strong>device_ids</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.12)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.12)"><em>int</em></a><em>]</em>) – Device ID list, necessary only if forward_func
 applies a DataParallel model, which allows reconstruction of
@@ -193,7 +193,7 @@ to the size of an input, which allows visualizing in the input space.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>layer_attribution</strong> (<a class="reference external" href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.1)"><em>Tensor</em></a>) – Tensor of given layer attributions.</p></li>
+<li><p><strong>layer_attribution</strong> (<a class="reference external" href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.2)"><em>Tensor</em></a>) – Tensor of given layer attributions.</p></li>
 <li><p><strong>interpolate_dims</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.12)"><em>int</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.12)"><em>tuple</em></a>) – Upsampled dimensions. The
 number of elements must be the number of dimensions
 of layer_attribution - 2, since the first dimension
@@ -242,10 +242,10 @@ always matches the size of the input.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>forward_func</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.12)"><em>Callable</em></a><em> or </em><a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.1)"><em>torch.nn.Module</em></a>) – This can either be an instance
+<li><p><strong>forward_func</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.12)"><em>Callable</em></a><em> or </em><a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.2)"><em>torch.nn.Module</em></a>) – This can either be an instance
 of pytorch model or any modification of model’s forward
 function.</p></li>
-<li><p><strong>layer</strong> (<a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.1)"><em>torch.nn.Module</em></a>) – Layer for which output attributions are computed.
+<li><p><strong>layer</strong> (<a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.2)"><em>torch.nn.Module</em></a>) – Layer for which output attributions are computed.
 Output size of attribute matches that of layer output.</p></li>
 <li><p><strong>device_ids</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.12)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.12)"><em>int</em></a><em>]</em>) – Device ID list, necessary only if forward_func
 applies a DataParallel model, which allows reconstruction of
@@ -303,7 +303,7 @@ forward function, which most commonly is the forward function of the model
 that we want to interpret or the model itself.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>forward_func</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.12)"><em>Callable</em></a><em> or </em><a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.1)"><em>torch.nn.Module</em></a>) – This can either be an instance
+<dd class="field-odd"><p><strong>forward_func</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.12)"><em>Callable</em></a><em> or </em><a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.2)"><em>torch.nn.Module</em></a>) – This can either be an instance
 of pytorch model or any modification of model’s forward
 function.</p>
 </dd>
@@ -325,7 +325,7 @@ it is provided in form of a list or a non-singleton tensor.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>attributions</strong> (<a class="reference external" href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.1)"><em>Tensor</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.12)"><em>tuple</em></a><em>[</em><a class="reference external" href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.1)"><em>Tensor</em></a><em>, </em><em>...</em><em>]</em>) – Precomputed attribution
+<li><p><strong>attributions</strong> (<a class="reference external" href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.2)"><em>Tensor</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.12)"><em>tuple</em></a><em>[</em><a class="reference external" href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.2)"><em>Tensor</em></a><em>, </em><em>...</em><em>]</em>) – Precomputed attribution
 scores. The user can compute those using any attribution
 algorithm. It is assumed the shape and the
 dimensionality of attributions must match the shape and
@@ -334,17 +334,17 @@ It also assumes that the attribution tensor’s
 dimension 0 corresponds to the number of
 examples, and if multiple input tensors are provided,
 the examples must be aligned appropriately.</p></li>
-<li><p><strong>start_point</strong> (<a class="reference external" href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.1)"><em>Tensor</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.12)"><em>tuple</em></a><em>[</em><a class="reference external" href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.1)"><em>Tensor</em></a><em>, </em><em>...</em><em>]</em><em>, </em><em>optional</em>) – <cite>start_point</cite>
+<li><p><strong>start_point</strong> (<a class="reference external" href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.2)"><em>Tensor</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.12)"><em>tuple</em></a><em>[</em><a class="reference external" href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.2)"><em>Tensor</em></a><em>, </em><em>...</em><em>]</em><em>, </em><em>optional</em>) – <cite>start_point</cite>
 is passed as an input to model’s forward function. It
 is the starting point of attributions’ approximation.
 It is assumed that both <cite>start_point</cite> and <cite>end_point</cite>
 have the same shape and dimensionality.</p></li>
-<li><p><strong>end_point</strong> (<a class="reference external" href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.1)"><em>Tensor</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.12)"><em>tuple</em></a><em>[</em><a class="reference external" href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.1)"><em>Tensor</em></a><em>, </em><em>...</em><em>]</em>) – <cite>end_point</cite>
+<li><p><strong>end_point</strong> (<a class="reference external" href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.2)"><em>Tensor</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.12)"><em>tuple</em></a><em>[</em><a class="reference external" href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.2)"><em>Tensor</em></a><em>, </em><em>...</em><em>]</em>) – <cite>end_point</cite>
 is passed as an input to model’s forward function. It
 is the end point of attributions’ approximation.
 It is assumed that both <cite>start_point</cite> and <cite>end_point</cite>
 have the same shape and dimensionality.</p></li>
-<li><p><strong>target</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.12)"><em>int</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.12)"><em>tuple</em></a><em>, </em><a class="reference external" href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.1)"><em>Tensor</em></a><em>, or </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.12)"><em>list</em></a><em>, </em><em>optional</em>) – <p>Output indices for
+<li><p><strong>target</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.12)"><em>int</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.12)"><em>tuple</em></a><em>, </em><a class="reference external" href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.2)"><em>Tensor</em></a><em>, or </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.12)"><em>list</em></a><em>, </em><em>optional</em>) – <p>Output indices for
 which gradients are computed (for classification cases,
 this is usually the target class).
 If the network returns a scalar value per example,
@@ -413,7 +413,7 @@ forward function, which most commonly is the forward function of the model
 that we want to interpret or the model itself.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>forward_func</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.12)"><em>Callable</em></a><em> or </em><a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.1)"><em>torch.nn.Module</em></a>) – This can either be an instance
+<dd class="field-odd"><p><strong>forward_func</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.12)"><em>Callable</em></a><em> or </em><a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.2)"><em>torch.nn.Module</em></a>) – This can either be an instance
 of pytorch model or any modification of model’s forward
 function.</p>
 </dd>
@@ -477,7 +477,7 @@ function.</p>
 </div>
 </div>
 <div class="clearer"></div>
-</div></div></div><footer class="nav-footer" id="footer"><section class="sitemap"><div class="footerSection"><h5>Docs</h5><a href="/docs/introduction">Introduction</a><a href="/docs/getting_started">Getting Started</a><a href="/tutorials/">Tutorials</a><a href="/api/">API Reference</a></div><div class="footerSection"><h5>Legal</h5><a href="https://opensource.facebook.com/legal/privacy/" target="_blank" rel="noreferrer noopener">Privacy</a><a href="https://opensource.facebook.com/legal/terms/" target="_blank" rel="noreferrer noopener">Terms</a></div><div class="footerSection"><h5>Social</h5><div class="social"><a class="github-button" href="https://github.com/pytorch/captum" data-count-href="https://github.com/pytorch/captum/stargazers" data-show-count="true" data-count-aria-label="# stargazers on GitHub" aria-label="Star Captum on GitHub">captum</a></div></div></section><a href="https://opensource.facebook.com/" target="_blank" rel="noreferrer noopener" class="fbOpenSource"><img src="/img/oss_logo.png" alt="Facebook Open Source" width="170" height="45"/></a><section class="copyright"> Copyright © 2023 Facebook Inc.</section><script>
+</div></div></div><footer class="nav-footer" id="footer"><section class="sitemap"><div class="footerSection"><h5>Docs</h5><a href="/docs/introduction">Introduction</a><a href="/docs/getting_started">Getting Started</a><a href="/tutorials/">Tutorials</a><a href="/api/">API Reference</a></div><div class="footerSection"><h5>Legal</h5><a href="https://opensource.facebook.com/legal/privacy/" target="_blank" rel="noreferrer noopener">Privacy</a><a href="https://opensource.facebook.com/legal/terms/" target="_blank" rel="noreferrer noopener">Terms</a></div><div class="footerSection"><h5>Social</h5><div class="social"><a class="github-button" href="https://github.com/pytorch/captum" data-count-href="https://github.com/pytorch/captum/stargazers" data-show-count="true" data-count-aria-label="# stargazers on GitHub" aria-label="Star Captum on GitHub">captum</a></div></div></section><a href="https://opensource.facebook.com/" target="_blank" rel="noreferrer noopener" class="fbOpenSource"><img src="/img/oss_logo.png" alt="Facebook Open Source" width="170" height="45"/></a><section class="copyright"> Copyright © 2024 Facebook Inc.</section><script>
             (function() {
               var BAD_BASE = '/captum/';
               if (window.location.origin !== 'https://captum.ai') {

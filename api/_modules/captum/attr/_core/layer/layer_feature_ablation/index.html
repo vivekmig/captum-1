@@ -324,10 +324,10 @@ src="/_sphinx/documentation_options.js"></script>
                 <span class="k">else</span> <span class="n">inputs</span> <span class="o">+</span> <span class="n">layer_eval_len</span>
             <span class="p">)</span>
 
-            <span class="n">ablator</span> <span class="o">=</span> <span class="n">FeatureAblation</span><span class="p">(</span><span class="n">layer_forward_func</span><span class="p">)</span>
+            <span class="n">attributor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">attributor</span><span class="p">(</span><span class="n">layer_forward_func</span><span class="p">)</span>
 
-            <span class="n">layer_attribs</span> <span class="o">=</span> <span class="n">ablator</span><span class="o">.</span><span class="n">attribute</span><span class="o">.</span><span class="n">__wrapped__</span><span class="p">(</span>
-                <span class="n">ablator</span><span class="p">,</span>  <span class="c1"># self</span>
+            <span class="n">layer_attribs</span> <span class="o">=</span> <span class="n">attributor</span><span class="o">.</span><span class="n">attribute</span><span class="o">.</span><span class="n">__wrapped__</span><span class="p">(</span>
+                <span class="n">attributor</span><span class="p">,</span>  <span class="c1"># self</span>
                 <span class="n">layer_eval</span><span class="p">,</span>
                 <span class="n">baselines</span><span class="o">=</span><span class="n">layer_baselines</span><span class="p">,</span>
                 <span class="n">additional_forward_args</span><span class="o">=</span><span class="n">all_inputs</span><span class="p">,</span>
@@ -336,7 +336,11 @@ src="/_sphinx/documentation_options.js"></script>
             <span class="p">)</span>
             <span class="n">_attr</span> <span class="o">=</span> <span class="n">_format_output</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">layer_attribs</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">,</span> <span class="n">layer_attribs</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">_attr</span></div>
-</div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">attributor</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">FeatureAblation</span></div>
 
 </pre></div>
 </div>
@@ -388,7 +392,7 @@ src="/_sphinx/documentation_options.js"></script>
 </div>
 </div>
 <div class="clearer"></div>
-</div></div></div><footer class="nav-footer" id="footer"><section class="sitemap"><div class="footerSection"><h5>Docs</h5><a href="/docs/introduction">Introduction</a><a href="/docs/getting_started">Getting Started</a><a href="/tutorials/">Tutorials</a><a href="/api/">API Reference</a></div><div class="footerSection"><h5>Legal</h5><a href="https://opensource.facebook.com/legal/privacy/" target="_blank" rel="noreferrer noopener">Privacy</a><a href="https://opensource.facebook.com/legal/terms/" target="_blank" rel="noreferrer noopener">Terms</a></div><div class="footerSection"><h5>Social</h5><div class="social"><a class="github-button" href="https://github.com/pytorch/captum" data-count-href="https://github.com/pytorch/captum/stargazers" data-show-count="true" data-count-aria-label="# stargazers on GitHub" aria-label="Star Captum on GitHub">captum</a></div></div></section><a href="https://opensource.facebook.com/" target="_blank" rel="noreferrer noopener" class="fbOpenSource"><img src="/img/oss_logo.png" alt="Facebook Open Source" width="170" height="45"/></a><section class="copyright"> Copyright © 2023 Facebook Inc.</section><script>
+</div></div></div><footer class="nav-footer" id="footer"><section class="sitemap"><div class="footerSection"><h5>Docs</h5><a href="/docs/introduction">Introduction</a><a href="/docs/getting_started">Getting Started</a><a href="/tutorials/">Tutorials</a><a href="/api/">API Reference</a></div><div class="footerSection"><h5>Legal</h5><a href="https://opensource.facebook.com/legal/privacy/" target="_blank" rel="noreferrer noopener">Privacy</a><a href="https://opensource.facebook.com/legal/terms/" target="_blank" rel="noreferrer noopener">Terms</a></div><div class="footerSection"><h5>Social</h5><div class="social"><a class="github-button" href="https://github.com/pytorch/captum" data-count-href="https://github.com/pytorch/captum/stargazers" data-show-count="true" data-count-aria-label="# stargazers on GitHub" aria-label="Star Captum on GitHub">captum</a></div></div></section><a href="https://opensource.facebook.com/" target="_blank" rel="noreferrer noopener" class="fbOpenSource"><img src="/img/oss_logo.png" alt="Facebook Open Source" width="170" height="45"/></a><section class="copyright"> Copyright © 2024 Facebook Inc.</section><script>
             (function() {
               var BAD_BASE = '/captum/';
               if (window.location.origin !== 'https://captum.ai') {

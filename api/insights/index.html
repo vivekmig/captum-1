@@ -40,7 +40,7 @@ src="/_sphinx/documentation_options.js"></script>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>inputs</strong> (<a class="reference external" href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.1)"><em>Tensor</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.12)"><em>tuple</em></a><em>[</em><a class="reference external" href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.1)"><em>Tensor</em></a><em>, </em><em>...</em><em>]</em>) – Batch of inputs for a model.
+<li><p><strong>inputs</strong> (<a class="reference external" href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.2)"><em>Tensor</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.12)"><em>tuple</em></a><em>[</em><a class="reference external" href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.2)"><em>Tensor</em></a><em>, </em><em>...</em><em>]</em>) – Batch of inputs for a model.
 These may be either a Tensor or tuple of tensors. Each tensor
 must correspond to a feature for AttributionVisualizer, and
 the corresponding input transform function of the feature
@@ -48,7 +48,7 @@ is applied to each input tensor prior to passing it to the
 model. It is assumed that the first dimension of each
 input tensor corresponds to the number of examples
 (batch size) and is aligned for all input tensors.</p></li>
-<li><p><strong>labels</strong> (<a class="reference external" href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.1)"><em>Tensor</em></a>) – Tensor containing correct labels for input examples.
+<li><p><strong>labels</strong> (<a class="reference external" href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.2)"><em>Tensor</em></a>) – Tensor containing correct labels for input examples.
 This must be a 1D tensor with length matching the first
 dimension of each input tensor.</p></li>
 <li><p><strong>additional_args</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.12)"><em>tuple</em></a><em>, </em><em>optional</em>) – If the forward function
@@ -75,7 +75,7 @@ correspond to the number of examples.</p></li>
 <dd><dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>models</strong> (<a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.1)"><em>torch.nn.Module</em></a>) – One or more PyTorch modules (models) for
+<li><p><strong>models</strong> (<a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.2)"><em>torch.nn.Module</em></a>) – One or more PyTorch modules (models) for
 attribution visualization.</p></li>
 <li><p><strong>classes</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.12)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><em>str</em></a><em>]</em>) – List of strings corresponding to the names of
 classes for classification.</p></li>
@@ -303,7 +303,7 @@ format to be visualized.</p></li>
 </div>
 </div>
 <div class="clearer"></div>
-</div></div></div><footer class="nav-footer" id="footer"><section class="sitemap"><div class="footerSection"><h5>Docs</h5><a href="/docs/introduction">Introduction</a><a href="/docs/getting_started">Getting Started</a><a href="/tutorials/">Tutorials</a><a href="/api/">API Reference</a></div><div class="footerSection"><h5>Legal</h5><a href="https://opensource.facebook.com/legal/privacy/" target="_blank" rel="noreferrer noopener">Privacy</a><a href="https://opensource.facebook.com/legal/terms/" target="_blank" rel="noreferrer noopener">Terms</a></div><div class="footerSection"><h5>Social</h5><div class="social"><a class="github-button" href="https://github.com/pytorch/captum" data-count-href="https://github.com/pytorch/captum/stargazers" data-show-count="true" data-count-aria-label="# stargazers on GitHub" aria-label="Star Captum on GitHub">captum</a></div></div></section><a href="https://opensource.facebook.com/" target="_blank" rel="noreferrer noopener" class="fbOpenSource"><img src="/img/oss_logo.png" alt="Facebook Open Source" width="170" height="45"/></a><section class="copyright"> Copyright © 2023 Facebook Inc.</section><script>
+</div></div></div><footer class="nav-footer" id="footer"><section class="sitemap"><div class="footerSection"><h5>Docs</h5><a href="/docs/introduction">Introduction</a><a href="/docs/getting_started">Getting Started</a><a href="/tutorials/">Tutorials</a><a href="/api/">API Reference</a></div><div class="footerSection"><h5>Legal</h5><a href="https://opensource.facebook.com/legal/privacy/" target="_blank" rel="noreferrer noopener">Privacy</a><a href="https://opensource.facebook.com/legal/terms/" target="_blank" rel="noreferrer noopener">Terms</a></div><div class="footerSection"><h5>Social</h5><div class="social"><a class="github-button" href="https://github.com/pytorch/captum" data-count-href="https://github.com/pytorch/captum/stargazers" data-show-count="true" data-count-aria-label="# stargazers on GitHub" aria-label="Star Captum on GitHub">captum</a></div></div></section><a href="https://opensource.facebook.com/" target="_blank" rel="noreferrer noopener" class="fbOpenSource"><img src="/img/oss_logo.png" alt="Facebook Open Source" width="170" height="45"/></a><section class="copyright"> Copyright © 2024 Facebook Inc.</section><script>
             (function() {
               var BAD_BASE = '/captum/';
               if (window.location.origin !== 'https://captum.ai') {

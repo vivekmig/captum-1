@@ -275,19 +275,32 @@ src="/_sphinx/documentation_options.js"></script>
         <span class="n">perturbed_tensor</span><span class="p">,</span>
         <span class="n">inp</span><span class="p">,</span>
         <span class="n">target_tokens</span><span class="p">,</span>
-        <span class="n">_inspect_forward</span><span class="p">,</span>
+        <span class="n">use_cached_outputs</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">_inspect_forward</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="p">):</span>
         <span class="n">perturbed_input</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_format_model_input</span><span class="p">(</span><span class="n">inp</span><span class="o">.</span><span class="n">to_model_input</span><span class="p">(</span><span class="n">perturbed_tensor</span><span class="p">))</span>
         <span class="n">init_model_inp</span> <span class="o">=</span> <span class="n">perturbed_input</span>
 
         <span class="n">model_inp</span> <span class="o">=</span> <span class="n">init_model_inp</span>
+        <span class="n">model_kwargs</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"attention_mask"</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">model_inp</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]])}</span>
 
         <span class="n">log_prob_list</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="k">for</span> <span class="n">target_token</span> <span class="ow">in</span> <span class="n">target_tokens</span><span class="p">:</span>
-            <span class="n">output_logits</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span>
-                <span class="n">model_inp</span><span class="p">,</span> <span class="n">attention_mask</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">model_inp</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]])</span>
-            <span class="p">)</span>
-            <span class="n">new_token_logits</span> <span class="o">=</span> <span class="n">output_logits</span><span class="o">.</span><span class="n">logits</span><span class="p">[:,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">use_cached_outputs</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">outputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">model_kwargs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">_update_model_kwargs_for_generation</span><span class="p">(</span>
+                        <span class="n">outputs</span><span class="p">,</span> <span class="n">model_kwargs</span>
+                    <span class="p">)</span>
+                <span class="n">model_inputs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">prepare_inputs_for_generation</span><span class="p">(</span>
+                    <span class="n">model_inp</span><span class="p">,</span> <span class="o">**</span><span class="n">model_kwargs</span>
+                <span class="p">)</span>
+                <span class="n">outputs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="o">**</span><span class="n">model_inputs</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">outputs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span>
+                    <span class="n">model_inp</span><span class="p">,</span> <span class="n">attention_mask</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">model_inp</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]])</span>
+                <span class="p">)</span>
+            <span class="n">new_token_logits</span> <span class="o">=</span> <span class="n">outputs</span><span class="o">.</span><span class="n">logits</span><span class="p">[:,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span>
             <span class="n">log_probs</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">functional</span><span class="o">.</span><span class="n">log_softmax</span><span class="p">(</span><span class="n">new_token_logits</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 
             <span class="n">log_prob_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">log_probs</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">target_token</span><span class="p">]</span><span class="o">.</span><span class="n">detach</span><span class="p">())</span>
@@ -337,6 +350,7 @@ src="/_sphinx/documentation_options.js"></script>
         <span class="n">target</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">num_trials</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
         <span class="n">gen_args</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">use_cached_outputs</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
         <span class="c1"># internal callback hook can be used for logging</span>
         <span class="n">_inspect_forward</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
@@ -405,7 +419,12 @@ src="/_sphinx/documentation_options.js"></script>
 
             <span class="n">cur_attr</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">attr_method</span><span class="o">.</span><span class="n">attribute</span><span class="p">(</span>
                 <span class="n">attr_input</span><span class="p">,</span>
-                <span class="n">additional_forward_args</span><span class="o">=</span><span class="p">(</span><span class="n">inp</span><span class="p">,</span> <span class="n">target_tokens</span><span class="p">,</span> <span class="n">_inspect_forward</span><span class="p">),</span>
+                <span class="n">additional_forward_args</span><span class="o">=</span><span class="p">(</span>
+                    <span class="n">inp</span><span class="p">,</span>
+                    <span class="n">target_tokens</span><span class="p">,</span>
+                    <span class="n">use_cached_outputs</span><span class="p">,</span>
+                    <span class="n">_inspect_forward</span><span class="p">,</span>
+                <span class="p">),</span>
                 <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
             <span class="p">)</span>
 
@@ -422,9 +441,9 @@ src="/_sphinx/documentation_options.js"></script>
 
         <span class="k">return</span> <span class="n">LLMAttributionResult</span><span class="p">(</span>
             <span class="n">attr</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
-            <span class="n">attr</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">include_per_token_attr</span>
-            <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># shape(n_output_token, n_input_features)</span>
+            <span class="p">(</span>
+                <span class="n">attr</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">include_per_token_attr</span> <span class="k">else</span> <span class="kc">None</span>
+            <span class="p">),</span>  <span class="c1"># shape(n_output_token, n_input_features)</span>
             <span class="n">inp</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">convert_ids_to_tokens</span><span class="p">(</span><span class="n">target_tokens</span><span class="p">),</span>
         <span class="p">)</span></div>
@@ -678,7 +697,7 @@ src="/_sphinx/documentation_options.js"></script>
 </div>
 </div>
 <div class="clearer"></div>
-</div></div></div><footer class="nav-footer" id="footer"><section class="sitemap"><div class="footerSection"><h5>Docs</h5><a href="/docs/introduction">Introduction</a><a href="/docs/getting_started">Getting Started</a><a href="/tutorials/">Tutorials</a><a href="/api/">API Reference</a></div><div class="footerSection"><h5>Legal</h5><a href="https://opensource.facebook.com/legal/privacy/" target="_blank" rel="noreferrer noopener">Privacy</a><a href="https://opensource.facebook.com/legal/terms/" target="_blank" rel="noreferrer noopener">Terms</a></div><div class="footerSection"><h5>Social</h5><div class="social"><a class="github-button" href="https://github.com/pytorch/captum" data-count-href="https://github.com/pytorch/captum/stargazers" data-show-count="true" data-count-aria-label="# stargazers on GitHub" aria-label="Star Captum on GitHub">captum</a></div></div></section><a href="https://opensource.facebook.com/" target="_blank" rel="noreferrer noopener" class="fbOpenSource"><img src="/img/oss_logo.png" alt="Facebook Open Source" width="170" height="45"/></a><section class="copyright"> Copyright © 2023 Facebook Inc.</section><script>
+</div></div></div><footer class="nav-footer" id="footer"><section class="sitemap"><div class="footerSection"><h5>Docs</h5><a href="/docs/introduction">Introduction</a><a href="/docs/getting_started">Getting Started</a><a href="/tutorials/">Tutorials</a><a href="/api/">API Reference</a></div><div class="footerSection"><h5>Legal</h5><a href="https://opensource.facebook.com/legal/privacy/" target="_blank" rel="noreferrer noopener">Privacy</a><a href="https://opensource.facebook.com/legal/terms/" target="_blank" rel="noreferrer noopener">Terms</a></div><div class="footerSection"><h5>Social</h5><div class="social"><a class="github-button" href="https://github.com/pytorch/captum" data-count-href="https://github.com/pytorch/captum/stargazers" data-show-count="true" data-count-aria-label="# stargazers on GitHub" aria-label="Star Captum on GitHub">captum</a></div></div></section><a href="https://opensource.facebook.com/" target="_blank" rel="noreferrer noopener" class="fbOpenSource"><img src="/img/oss_logo.png" alt="Facebook Open Source" width="170" height="45"/></a><section class="copyright"> Copyright © 2024 Facebook Inc.</section><script>
             (function() {
               var BAD_BASE = '/captum/';
               if (window.location.origin !== 'https://captum.ai') {

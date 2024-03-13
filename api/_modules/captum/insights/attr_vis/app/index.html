@@ -67,7 +67,7 @@ src="/_sphinx/documentation_options.js"></script>
 <span class="n">_CONTEXT_NONE</span> <span class="o">=</span> <span class="s2">"_CONTEXT_NONE"</span>
 
 
-<span class="k">def</span> <span class="nf">_get_context</span><span class="p">():</span>
+<span class="k">def</span> <span class="nf">_get_context</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Determine the most specific context that we're in.</span>
 <span class="sd">    Implementation from TensorBoard: https://git.io/JvObD.</span>
 
@@ -254,7 +254,7 @@ src="/_sphinx/documentation_options.js"></script>
             <span class="k">return</span> <span class="kc">None</span>
         <span class="k">return</span> <span class="n">result</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
 
-    <span class="k">def</span> <span class="nf">_update_config</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">settings</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">_update_config</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_config</span> <span class="o">=</span> <span class="n">FilterConfig</span><span class="p">(</span>
             <span class="n">attribution_method</span><span class="o">=</span><span class="n">settings</span><span class="p">[</span><span class="s2">"attribution_method"</span><span class="p">],</span>
             <span class="n">attribution_arguments</span><span class="o">=</span><span class="n">settings</span><span class="p">[</span><span class="s2">"arguments"</span><span class="p">],</span>
@@ -264,8 +264,8 @@ src="/_sphinx/documentation_options.js"></script>
         <span class="p">)</span>
 
     <span class="nd">@log_usage</span><span class="p">()</span>
-    <span class="k">def</span> <span class="nf">render</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">debug</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
-        <span class="kn">from</span> <span class="nn">captum.insights.attr_vis.widget</span> <span class="kn">import</span> <span class="n">CaptumInsights</span>
+    <span class="k">def</span> <span class="nf">render</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="kn">from</span> <span class="nn">captum.insights.attr_vis.widget.widget</span> <span class="kn">import</span> <span class="n">CaptumInsights</span>
         <span class="kn">from</span> <span class="nn">IPython.display</span> <span class="kn">import</span> <span class="n">display</span>
 
         <span class="n">widget</span> <span class="o">=</span> <span class="n">CaptumInsights</span><span class="p">(</span><span class="n">visualizer</span><span class="o">=</span><span class="bp">self</span><span class="p">)</span>
@@ -274,7 +274,13 @@ src="/_sphinx/documentation_options.js"></script>
             <span class="n">display</span><span class="p">(</span><span class="n">widget</span><span class="o">.</span><span class="n">out</span><span class="p">)</span>
 
     <span class="nd">@log_usage</span><span class="p">()</span>
-    <span class="k">def</span> <span class="nf">serve</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">blocking</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">debug</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">bind_all</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">serve</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">blocking</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">port</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">bind_all</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">):</span>
         <span class="n">context</span> <span class="o">=</span> <span class="n">_get_context</span><span class="p">()</span>
         <span class="k">if</span> <span class="n">context</span> <span class="o">==</span> <span class="n">_CONTEXT_COLAB</span><span class="p">:</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_serve_colab</span><span class="p">(</span><span class="n">blocking</span><span class="o">=</span><span class="n">blocking</span><span class="p">,</span> <span class="n">debug</span><span class="o">=</span><span class="n">debug</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="n">port</span><span class="p">)</span>
@@ -283,14 +289,22 @@ src="/_sphinx/documentation_options.js"></script>
                 <span class="n">blocking</span><span class="o">=</span><span class="n">blocking</span><span class="p">,</span> <span class="n">debug</span><span class="o">=</span><span class="n">debug</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="n">port</span><span class="p">,</span> <span class="n">bind_all</span><span class="o">=</span><span class="n">bind_all</span>
             <span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">_serve</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">blocking</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">debug</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">bind_all</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">_serve</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">blocking</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">port</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">bind_all</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">):</span>
         <span class="kn">from</span> <span class="nn">captum.insights.attr_vis.server</span> <span class="kn">import</span> <span class="n">start_server</span>
 
         <span class="k">return</span> <span class="n">start_server</span><span class="p">(</span>
             <span class="bp">self</span><span class="p">,</span> <span class="n">blocking</span><span class="o">=</span><span class="n">blocking</span><span class="p">,</span> <span class="n">debug</span><span class="o">=</span><span class="n">debug</span><span class="p">,</span> <span class="n">_port</span><span class="o">=</span><span class="n">port</span><span class="p">,</span> <span class="n">bind_all</span><span class="o">=</span><span class="n">bind_all</span>
         <span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">_serve_colab</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">blocking</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">debug</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">_serve_colab</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">blocking</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="kn">import</span> <span class="nn">ipywidgets</span> <span class="k">as</span> <span class="nn">widgets</span>
         <span class="kn">from</span> <span class="nn">captum.insights.attr_vis.server</span> <span class="kn">import</span> <span class="n">start_server</span>
         <span class="kn">from</span> <span class="nn">IPython.display</span> <span class="kn">import</span> <span class="n">display</span><span class="p">,</span> <span class="n">HTML</span>
@@ -461,14 +475,16 @@ src="/_sphinx/documentation_options.js"></script>
                     <span class="n">feature_outputs</span><span class="o">=</span><span class="n">features_per_input</span><span class="p">,</span>
                     <span class="n">actual</span><span class="o">=</span><span class="n">actual_label_output</span><span class="p">,</span>
                     <span class="n">predicted</span><span class="o">=</span><span class="n">predicted_scores</span><span class="p">,</span>
-                    <span class="n">active_index</span><span class="o">=</span><span class="n">target</span>
-                    <span class="k">if</span> <span class="n">target</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-                    <span class="k">else</span> <span class="n">actual_label_output</span><span class="o">.</span><span class="n">index</span><span class="p">,</span>
+                    <span class="n">active_index</span><span class="o">=</span><span class="p">(</span>
+                        <span class="n">target</span> <span class="k">if</span> <span class="n">target</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">actual_label_output</span><span class="o">.</span><span class="n">index</span>
+                    <span class="p">),</span>
                     <span class="c1"># Even if we only iterated over one model, the index should be fixed</span>
                     <span class="c1"># to show the index the model would have had in the list</span>
-                    <span class="n">model_index</span><span class="o">=</span><span class="n">single_model_index</span>
-                    <span class="k">if</span> <span class="n">single_model_index</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-                    <span class="k">else</span> <span class="n">model_index</span><span class="p">,</span>
+                    <span class="n">model_index</span><span class="o">=</span><span class="p">(</span>
+                        <span class="n">single_model_index</span>
+                        <span class="k">if</span> <span class="n">single_model_index</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                        <span class="k">else</span> <span class="n">model_index</span>
+                    <span class="p">),</span>
                 <span class="p">)</span>
             <span class="p">)</span>
 
@@ -519,7 +535,7 @@ src="/_sphinx/documentation_options.js"></script>
             <span class="bp">self</span><span class="o">.</span><span class="n">_outputs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_get_outputs</span><span class="p">())</span>
         <span class="k">return</span> <span class="p">[</span><span class="n">o</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_outputs</span><span class="p">]</span>
 
-    <span class="k">def</span> <span class="nf">get_insights_config</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">get_insights_config</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
         <span class="k">return</span> <span class="p">{</span>
             <span class="s2">"classes"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">classes</span><span class="p">,</span>
             <span class="s2">"methods"</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">ATTRIBUTION_NAMES_TO_METHODS</span><span class="o">.</span><span class="n">keys</span><span class="p">()),</span>
@@ -579,7 +595,7 @@ src="/_sphinx/documentation_options.js"></script>
 </div>
 </div>
 <div class="clearer"></div>
-</div></div></div><footer class="nav-footer" id="footer"><section class="sitemap"><div class="footerSection"><h5>Docs</h5><a href="/docs/introduction">Introduction</a><a href="/docs/getting_started">Getting Started</a><a href="/tutorials/">Tutorials</a><a href="/api/">API Reference</a></div><div class="footerSection"><h5>Legal</h5><a href="https://opensource.facebook.com/legal/privacy/" target="_blank" rel="noreferrer noopener">Privacy</a><a href="https://opensource.facebook.com/legal/terms/" target="_blank" rel="noreferrer noopener">Terms</a></div><div class="footerSection"><h5>Social</h5><div class="social"><a class="github-button" href="https://github.com/pytorch/captum" data-count-href="https://github.com/pytorch/captum/stargazers" data-show-count="true" data-count-aria-label="# stargazers on GitHub" aria-label="Star Captum on GitHub">captum</a></div></div></section><a href="https://opensource.facebook.com/" target="_blank" rel="noreferrer noopener" class="fbOpenSource"><img src="/img/oss_logo.png" alt="Facebook Open Source" width="170" height="45"/></a><section class="copyright"> Copyright © 2023 Facebook Inc.</section><script>
+</div></div></div><footer class="nav-footer" id="footer"><section class="sitemap"><div class="footerSection"><h5>Docs</h5><a href="/docs/introduction">Introduction</a><a href="/docs/getting_started">Getting Started</a><a href="/tutorials/">Tutorials</a><a href="/api/">API Reference</a></div><div class="footerSection"><h5>Legal</h5><a href="https://opensource.facebook.com/legal/privacy/" target="_blank" rel="noreferrer noopener">Privacy</a><a href="https://opensource.facebook.com/legal/terms/" target="_blank" rel="noreferrer noopener">Terms</a></div><div class="footerSection"><h5>Social</h5><div class="social"><a class="github-button" href="https://github.com/pytorch/captum" data-count-href="https://github.com/pytorch/captum/stargazers" data-show-count="true" data-count-aria-label="# stargazers on GitHub" aria-label="Star Captum on GitHub">captum</a></div></div></section><a href="https://opensource.facebook.com/" target="_blank" rel="noreferrer noopener" class="fbOpenSource"><img src="/img/oss_logo.png" alt="Facebook Open Source" width="170" height="45"/></a><section class="copyright"> Copyright © 2024 Facebook Inc.</section><script>
             (function() {
               var BAD_BASE = '/captum/';
               if (window.location.origin !== 'https://captum.ai') {
