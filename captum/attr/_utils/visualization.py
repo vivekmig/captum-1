@@ -4,12 +4,17 @@ from enum import Enum
 from typing import Any, Iterable, List, Optional, Tuple, Union
 
 import numpy as np
-from matplotlib import cm, colors, pyplot as plt
-from matplotlib.collections import LineCollection
-from matplotlib.colors import LinearSegmentedColormap
-from matplotlib.figure import Figure
-from matplotlib.pyplot import axis, figure
-from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+try:
+    from matplotlib import cm, colors, pyplot as plt
+    from matplotlib.collections import LineCollection
+    from matplotlib.colors import LinearSegmentedColormap
+    from matplotlib.figure import Figure
+    from matplotlib.pyplot import axis, figure
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
+except:
+    print("Couldn't load matplotlib!")
+
 from numpy import ndarray
 
 try:
@@ -102,7 +107,7 @@ def visualize_image_attr(
     original_image: Union[None, ndarray] = None,
     method: str = "heat_map",
     sign: str = "absolute_value",
-    plt_fig_axis: Union[None, Tuple[figure, axis]] = None,
+    plt_fig_axis: Any = None,
     outlier_perc: Union[int, float] = 2,
     cmap: Union[None, str] = None,
     alpha_overlay: float = 0.5,
@@ -452,7 +457,7 @@ def visualize_timeseries_attr(
     sign: str = "absolute_value",
     channel_labels: Optional[List[str]] = None,
     channels_last: bool = True,
-    plt_fig_axis: Union[None, Tuple[figure, axis]] = None,
+    plt_fig_axis: Any = None,
     outlier_perc: Union[int, float] = 2,
     cmap: Union[None, str] = None,
     alpha_overlay: float = 0.7,

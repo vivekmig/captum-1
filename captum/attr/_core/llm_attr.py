@@ -1,8 +1,10 @@
 from copy import copy
 
 from typing import Callable, cast, Dict, List, Optional, Union
-
-import matplotlib.pyplot as plt
+try:
+    import matplotlib.pyplot as plt
+except:
+    print("Couldn't load matplotlib!")
 import numpy as np
 
 import torch
