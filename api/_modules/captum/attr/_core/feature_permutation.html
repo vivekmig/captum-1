@@ -31,6 +31,8 @@ src="/_sphinx/documentation_options.js"></script>
 <div class="body" role="main">
 <h1>Source code for captum.attr._core.feature_permutation</h1><div class="highlight"><pre>
 <span></span><span class="ch">#!/usr/bin/env python3</span>
+
+<span class="c1"># pyre-strict</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="kn">import</span> <span class="nn">torch</span>
@@ -38,6 +40,7 @@ src="/_sphinx/documentation_options.js"></script>
 <span class="kn">from</span> <span class="nn">captum.attr._core.feature_ablation</span> <span class="kn">import</span> <span class="n">FeatureAblation</span>
 <span class="kn">from</span> <span class="nn">captum.log</span> <span class="kn">import</span> <span class="n">log_usage</span>
 <span class="kn">from</span> <span class="nn">torch</span> <span class="kn">import</span> <span class="n">Tensor</span>
+<span class="kn">from</span> <span class="nn">torch.futures</span> <span class="kn">import</span> <span class="n">Future</span>
 
 
 <span class="k">def</span> <span class="nf">_permute_feature</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">feature_mask</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
@@ -104,7 +107,11 @@ src="/_sphinx/documentation_options.js"></script>
 <span class="sd">    """</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">forward_func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">perm_func</span><span class="p">:</span> <span class="n">Callable</span> <span class="o">=</span> <span class="n">_permute_feature</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="c1"># pyre-fixme[24]: Generic type `Callable` expects 2 type parameters.</span>
+        <span class="n">forward_func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
+        <span class="c1"># pyre-fixme[24]: Generic type `Callable` expects 2 type parameters.</span>
+        <span class="n">perm_func</span><span class="p">:</span> <span class="n">Callable</span> <span class="o">=</span> <span class="n">_permute_feature</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sa">r</span><span class="sd">"""</span>
 <span class="sd">        Args:</span>
@@ -120,6 +127,7 @@ src="/_sphinx/documentation_options.js"></script>
 <span class="sd">        """</span>
         <span class="n">FeatureAblation</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">forward_func</span><span class="o">=</span><span class="n">forward_func</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">perm_func</span> <span class="o">=</span> <span class="n">perm_func</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">use_futures</span> <span class="o">=</span> <span class="kc">False</span>
 
     <span class="c1"># suppressing error caused by the child class not having a matching</span>
     <span class="c1"># signature to the parent</span>
@@ -130,6 +138,7 @@ src="/_sphinx/documentation_options.js"></script>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">inputs</span><span class="p">:</span> <span class="n">TensorOrTupleOfTensorsGeneric</span><span class="p">,</span>
         <span class="n">target</span><span class="p">:</span> <span class="n">TargetType</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="c1"># pyre-fixme[2]: Parameter annotation cannot be `Any`.</span>
         <span class="n">additional_forward_args</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">feature_mask</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="n">TensorOrTupleOfTensorsGeneric</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">perturbations_per_eval</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
@@ -308,6 +317,32 @@ src="/_sphinx/documentation_options.js"></script>
         <span class="p">)</span></div>
 
 
+    <span class="k">def</span> <span class="nf">attribute_future</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">inputs</span><span class="p">:</span> <span class="n">TensorOrTupleOfTensorsGeneric</span><span class="p">,</span>
+        <span class="n">target</span><span class="p">:</span> <span class="n">TargetType</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="c1"># pyre-fixme[2]: Parameter annotation cannot be `Any`.</span>
+        <span class="n">additional_forward_args</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">feature_mask</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="n">TensorOrTupleOfTensorsGeneric</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">perturbations_per_eval</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="n">show_progress</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Future</span><span class="p">[</span><span class="n">TensorOrTupleOfTensorsGeneric</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">kwargs</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="ow">and</span> <span class="s2">"baselines"</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="k">del</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">"baselines"</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">FeatureAblation</span><span class="o">.</span><span class="n">attribute</span><span class="o">.</span><span class="n">__wrapped__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">inputs</span><span class="p">,</span>
+            <span class="n">baselines</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">target</span><span class="o">=</span><span class="n">target</span><span class="p">,</span>
+            <span class="n">additional_forward_args</span><span class="o">=</span><span class="n">additional_forward_args</span><span class="p">,</span>
+            <span class="n">feature_mask</span><span class="o">=</span><span class="n">feature_mask</span><span class="p">,</span>
+            <span class="n">perturbations_per_eval</span><span class="o">=</span><span class="n">perturbations_per_eval</span><span class="p">,</span>
+            <span class="n">show_progress</span><span class="o">=</span><span class="n">show_progress</span><span class="p">,</span>
+            <span class="n">use_futures</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">use_futures</span><span class="p">,</span>
+            <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+        <span class="p">)</span>
+
     <span class="k">def</span> <span class="nf">_construct_ablated_input</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">expanded_input</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -338,6 +373,7 @@ src="/_sphinx/documentation_options.js"></script>
         <span class="n">current_mask</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span>
             <span class="p">[</span><span class="n">input_mask</span> <span class="o">==</span> <span class="n">j</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">start_feature</span><span class="p">,</span> <span class="n">end_feature</span><span class="p">)],</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span>
         <span class="p">)</span><span class="o">.</span><span class="n">bool</span><span class="p">()</span>
+        <span class="n">current_mask</span> <span class="o">=</span> <span class="n">current_mask</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">expanded_input</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
 
         <span class="n">output</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span>
             <span class="p">[</span>
@@ -351,10 +387,18 @@ src="/_sphinx/documentation_options.js"></script>
 </div>
 </div>
 </div>
-<div aria-label="main navigation" class="sphinxsidebar" role="navigation">
+<div aria-label="Main" class="sphinxsidebar" role="navigation">
 <div class="sphinxsidebarwrapper">
 <h1 class="logo"><a href="../../../../index.html">Captum</a></h1>
-<h3>Navigation</h3>
+<search id="searchbox" role="search" style="display: none">
+<div class="searchformwrapper">
+<form action="../../../../search.html" class="search" method="get">
+<input aria-labelledby="searchlabel" autocapitalize="off" autocomplete="off" autocorrect="off" name="q" placeholder="Search" spellcheck="false" type="text"/>
+<input type="submit" value="Go"/>
+</form>
+</div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../../attribution.html">Attribution</a></li>
@@ -384,16 +428,6 @@ src="/_sphinx/documentation_options.js"></script>
 </ul></li>
 </ul>
 </div>
-<div id="searchbox" role="search" style="display: none">
-<h3 id="searchlabel">Quick search</h3>
-<div class="searchformwrapper">
-<form action="../../../../search.html" class="search" method="get">
-<input aria-labelledby="searchlabel" autocapitalize="off" autocomplete="off" autocorrect="off" name="q" spellcheck="false" type="text"/>
-<input type="submit" value="Go"/>
-</form>
-</div>
-</div>
-<script>document.getElementById('searchbox').style.display = "block"</script>
 </div>
 </div>
 <div class="clearer"></div>

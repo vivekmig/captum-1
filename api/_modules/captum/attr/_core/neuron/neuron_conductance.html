@@ -31,8 +31,10 @@ src="/_sphinx/documentation_options.js"></script>
 <div class="body" role="main">
 <h1>Source code for captum.attr._core.neuron.neuron_conductance</h1><div class="highlight"><pre>
 <span></span><span class="ch">#!/usr/bin/env python3</span>
+
+<span class="c1"># pyre-strict</span>
 <span class="kn">import</span> <span class="nn">warnings</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">from</span> <span class="nn">captum._utils.common</span> <span class="kn">import</span> <span class="p">(</span>
@@ -71,6 +73,7 @@ src="/_sphinx/documentation_options.js"></script>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
+        <span class="c1"># pyre-fixme[24]: Generic type `Callable` expects 2 type parameters.</span>
         <span class="n">forward_func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
         <span class="n">layer</span><span class="p">:</span> <span class="n">Module</span><span class="p">,</span>
         <span class="n">device_ids</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -127,14 +130,17 @@ src="/_sphinx/documentation_options.js"></script>
     <span class="k">def</span> <span class="nf">attribute</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">inputs</span><span class="p">:</span> <span class="n">TensorOrTupleOfTensorsGeneric</span><span class="p">,</span>
+        <span class="c1"># pyre-fixme[24]: Generic type `Callable` expects 2 type parameters.</span>
         <span class="n">neuron_selector</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">Callable</span><span class="p">],</span>
         <span class="n">baselines</span><span class="p">:</span> <span class="n">BaselineType</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">target</span><span class="p">:</span> <span class="n">TargetType</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="c1"># pyre-fixme[2]: Parameter annotation cannot be `Any`.</span>
         <span class="n">additional_forward_args</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">n_steps</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">50</span><span class="p">,</span>
         <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"riemann_trapezoid"</span><span class="p">,</span>
         <span class="n">internal_batch_size</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">attribute_to_neuron_input</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">grad_kwargs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TensorOrTupleOfTensorsGeneric</span><span class="p">:</span>
 <span class="w">        </span><span class="sa">r</span><span class="sd">"""</span>
 <span class="sd">        Args:</span>
@@ -315,9 +321,15 @@ src="/_sphinx/documentation_options.js"></script>
                 <span class="s2">" or performing other operations on the tensor may lead to inaccurate"</span>
                 <span class="s2">" results."</span>
             <span class="p">)</span>
+        <span class="c1"># pyre-fixme[6]: For 1st argument expected `Tensor` but got</span>
+        <span class="c1">#  `TensorOrTupleOfTensorsGeneric`.</span>
         <span class="n">is_inputs_tuple</span> <span class="o">=</span> <span class="n">_is_tuple</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
 
+        <span class="c1"># pyre-fixme[9]: inputs has type `TensorOrTupleOfTensorsGeneric`; used as</span>
+        <span class="c1">#  `Tuple[Tensor, ...]`.</span>
         <span class="n">inputs</span><span class="p">,</span> <span class="n">baselines</span> <span class="o">=</span> <span class="n">_format_input_baseline</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="n">baselines</span><span class="p">)</span>
+        <span class="c1"># pyre-fixme[6]: For 1st argument expected `Tuple[Tensor, ...]` but got</span>
+        <span class="c1">#  `TensorOrTupleOfTensorsGeneric`.</span>
         <span class="n">_validate_input</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="n">baselines</span><span class="p">,</span> <span class="n">n_steps</span><span class="p">,</span> <span class="n">method</span><span class="p">)</span>
 
         <span class="n">num_examples</span> <span class="o">=</span> <span class="n">inputs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
@@ -339,6 +351,8 @@ src="/_sphinx/documentation_options.js"></script>
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">attrs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_attribute</span><span class="p">(</span>
+                <span class="c1"># pyre-fixme[6]: For 1st argument expected `Tuple[Tensor, ...]` but</span>
+                <span class="c1">#  got `TensorOrTupleOfTensorsGeneric`.</span>
                 <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
                 <span class="n">neuron_selector</span><span class="o">=</span><span class="n">neuron_selector</span><span class="p">,</span>
                 <span class="n">baselines</span><span class="o">=</span><span class="n">baselines</span><span class="p">,</span>
@@ -347,21 +361,27 @@ src="/_sphinx/documentation_options.js"></script>
                 <span class="n">n_steps</span><span class="o">=</span><span class="n">n_steps</span><span class="p">,</span>
                 <span class="n">method</span><span class="o">=</span><span class="n">method</span><span class="p">,</span>
                 <span class="n">attribute_to_neuron_input</span><span class="o">=</span><span class="n">attribute_to_neuron_input</span><span class="p">,</span>
+                <span class="n">grad_kwargs</span><span class="o">=</span><span class="n">grad_kwargs</span><span class="p">,</span>
             <span class="p">)</span>
+        <span class="c1"># pyre-fixme[7]: Expected `TensorOrTupleOfTensorsGeneric` but got</span>
+        <span class="c1">#  `Tuple[Tensor, ...]`.</span>
         <span class="k">return</span> <span class="n">_format_output</span><span class="p">(</span><span class="n">is_inputs_tuple</span><span class="p">,</span> <span class="n">attrs</span><span class="p">)</span></div>
 
 
     <span class="k">def</span> <span class="nf">_attribute</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">inputs</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+        <span class="c1"># pyre-fixme[24]: Generic type `Callable` expects 2 type parameters.</span>
         <span class="n">neuron_selector</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">Callable</span><span class="p">],</span>
         <span class="n">baselines</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span> <span class="o">...</span><span class="p">],</span>
         <span class="n">target</span><span class="p">:</span> <span class="n">TargetType</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="c1"># pyre-fixme[2]: Parameter annotation cannot be `Any`.</span>
         <span class="n">additional_forward_args</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">n_steps</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">50</span><span class="p">,</span>
         <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"riemann_trapezoid"</span><span class="p">,</span>
         <span class="n">attribute_to_neuron_input</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">step_sizes_and_alphas</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">float</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="nb">float</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">grad_kwargs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
 
         <span class="n">num_examples</span> <span class="o">=</span> <span class="n">inputs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
@@ -408,6 +428,7 @@ src="/_sphinx/documentation_options.js"></script>
             <span class="n">gradient_neuron_selector</span><span class="o">=</span><span class="n">neuron_selector</span><span class="p">,</span>
             <span class="n">device_ids</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">device_ids</span><span class="p">,</span>
             <span class="n">attribute_to_layer_input</span><span class="o">=</span><span class="n">attribute_to_neuron_input</span><span class="p">,</span>
+            <span class="n">grad_kwargs</span><span class="o">=</span><span class="n">grad_kwargs</span><span class="p">,</span>
         <span class="p">)</span>
 
         <span class="n">mid_grads</span> <span class="o">=</span> <span class="n">_verify_select_neuron</span><span class="p">(</span><span class="n">layer_gradients</span><span class="p">,</span> <span class="n">neuron_selector</span><span class="p">)</span>
@@ -426,6 +447,7 @@ src="/_sphinx/documentation_options.js"></script>
 
         <span class="c1"># Aggregates across all steps for each tensor in the input tuple</span>
         <span class="n">total_grads</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
+            <span class="c1"># pyre-fixme[6]: For 4th argument expected `Tuple[int, ...]` but got `Size`.</span>
             <span class="n">_reshape_and_sum</span><span class="p">(</span><span class="n">scaled_grad</span><span class="p">,</span> <span class="n">n_steps</span><span class="p">,</span> <span class="n">num_examples</span><span class="p">,</span> <span class="n">input_grad</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
             <span class="k">for</span> <span class="p">(</span><span class="n">scaled_grad</span><span class="p">,</span> <span class="n">input_grad</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">scaled_grads</span><span class="p">,</span> <span class="n">input_grads</span><span class="p">)</span>
         <span class="p">)</span>
@@ -443,6 +465,7 @@ src="/_sphinx/documentation_options.js"></script>
         <span class="k">return</span> <span class="n">attributions</span>
 
     <span class="nd">@property</span>
+    <span class="c1"># pyre-fixme[3]: Return type must be annotated.</span>
     <span class="k">def</span> <span class="nf">multiplies_by_inputs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_multiply_by_inputs</span></div>
 
@@ -450,10 +473,18 @@ src="/_sphinx/documentation_options.js"></script>
 </div>
 </div>
 </div>
-<div aria-label="main navigation" class="sphinxsidebar" role="navigation">
+<div aria-label="Main" class="sphinxsidebar" role="navigation">
 <div class="sphinxsidebarwrapper">
 <h1 class="logo"><a href="../../../../../index.html">Captum</a></h1>
-<h3>Navigation</h3>
+<search id="searchbox" role="search" style="display: none">
+<div class="searchformwrapper">
+<form action="../../../../../search.html" class="search" method="get">
+<input aria-labelledby="searchlabel" autocapitalize="off" autocomplete="off" autocorrect="off" name="q" placeholder="Search" spellcheck="false" type="text"/>
+<input type="submit" value="Go"/>
+</form>
+</div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../../../attribution.html">Attribution</a></li>
@@ -483,16 +514,6 @@ src="/_sphinx/documentation_options.js"></script>
 </ul></li>
 </ul>
 </div>
-<div id="searchbox" role="search" style="display: none">
-<h3 id="searchlabel">Quick search</h3>
-<div class="searchformwrapper">
-<form action="../../../../../search.html" class="search" method="get">
-<input aria-labelledby="searchlabel" autocapitalize="off" autocomplete="off" autocorrect="off" name="q" spellcheck="false" type="text"/>
-<input type="submit" value="Go"/>
-</form>
-</div>
-</div>
-<script>document.getElementById('searchbox').style.display = "block"</script>
 </div>
 </div>
 <div class="clearer"></div>
