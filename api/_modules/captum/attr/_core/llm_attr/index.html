@@ -31,20 +31,35 @@ src="/_sphinx/documentation_options.js"></script>
 <div class="body" role="main">
 <h1>Source code for captum.attr._core.llm_attr</h1><div class="highlight"><pre>
 <span></span><span class="c1"># pyre-strict</span>
-<span class="kn">from</span> <span class="nn">copy</span> <span class="kn">import</span> <span class="n">copy</span>
 
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">cast</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">import</span> <span class="nn">warnings</span>
+
+<span class="kn">from</span> <span class="nn">abc</span> <span class="kn">import</span> <span class="n">ABC</span>
+<span class="kn">from</span> <span class="nn">copy</span> <span class="kn">import</span> <span class="n">copy</span>
+<span class="kn">from</span> <span class="nn">dataclasses</span> <span class="kn">import</span> <span class="n">dataclass</span>
+<span class="kn">from</span> <span class="nn">textwrap</span> <span class="kn">import</span> <span class="n">shorten</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">cast</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Type</span><span class="p">,</span> <span class="n">Union</span>
+
+<span class="kn">import</span> <span class="nn">matplotlib.colors</span> <span class="k">as</span> <span class="nn">mcolors</span>
 
 <span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
 <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 
 <span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">from</span> <span class="nn">captum._utils.typing</span> <span class="kn">import</span> <span class="n">TokenizerLike</span>
 <span class="kn">from</span> <span class="nn">captum.attr._core.feature_ablation</span> <span class="kn">import</span> <span class="n">FeatureAblation</span>
 <span class="kn">from</span> <span class="nn">captum.attr._core.kernel_shap</span> <span class="kn">import</span> <span class="n">KernelShap</span>
+<span class="kn">from</span> <span class="nn">captum.attr._core.layer.layer_gradient_shap</span> <span class="kn">import</span> <span class="n">LayerGradientShap</span>
+<span class="kn">from</span> <span class="nn">captum.attr._core.layer.layer_gradient_x_activation</span> <span class="kn">import</span> <span class="n">LayerGradientXActivation</span>
 <span class="kn">from</span> <span class="nn">captum.attr._core.layer.layer_integrated_gradients</span> <span class="kn">import</span> <span class="n">LayerIntegratedGradients</span>
 <span class="kn">from</span> <span class="nn">captum.attr._core.lime</span> <span class="kn">import</span> <span class="n">Lime</span>
+<span class="kn">from</span> <span class="nn">captum.attr._core.remote_provider</span> <span class="kn">import</span> <span class="n">RemoteLLMProvider</span>
 <span class="kn">from</span> <span class="nn">captum.attr._core.shapley_value</span> <span class="kn">import</span> <span class="n">ShapleyValues</span><span class="p">,</span> <span class="n">ShapleyValueSampling</span>
-<span class="kn">from</span> <span class="nn">captum.attr._utils.attribution</span> <span class="kn">import</span> <span class="n">Attribution</span>
+<span class="kn">from</span> <span class="nn">captum.attr._utils.attribution</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">Attribution</span><span class="p">,</span>
+    <span class="n">GradientAttribution</span><span class="p">,</span>
+    <span class="n">PerturbationAttribution</span><span class="p">,</span>
+<span class="p">)</span>
 <span class="kn">from</span> <span class="nn">captum.attr._utils.interpretable_input</span> <span class="kn">import</span> <span class="p">(</span>
     <span class="n">InterpretableInput</span><span class="p">,</span>
     <span class="n">TextTemplateInput</span><span class="p">,</span>
@@ -52,12 +67,17 @@ src="/_sphinx/documentation_options.js"></script>
 <span class="p">)</span>
 <span class="kn">from</span> <span class="nn">torch</span> <span class="kn">import</span> <span class="n">nn</span><span class="p">,</span> <span class="n">Tensor</span>
 
-
-<span class="n">DEFAULT_GEN_ARGS</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"max_new_tokens"</span><span class="p">:</span> <span class="mi">25</span><span class="p">,</span> <span class="s2">"do_sample"</span><span class="p">:</span> <span class="kc">False</span><span class="p">}</span>
+<span class="n">DEFAULT_GEN_ARGS</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"max_new_tokens"</span><span class="p">:</span> <span class="mi">25</span><span class="p">,</span>
+    <span class="s2">"do_sample"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="s2">"temperature"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="s2">"top_p"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">}</span>
 
 
 <div class="viewcode-block" id="LLMAttributionResult">
 <a class="viewcode-back" href="../../../../llm_attr.html#captum.attr.LLMAttributionResult">[docs]</a>
+<span class="nd">@dataclass</span>
 <span class="k">class</span> <span class="nc">LLMAttributionResult</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Data class for the return result of LLMAttribution,</span>
@@ -65,29 +85,20 @@ src="/_sphinx/documentation_options.js"></script>
 <span class="sd">    It also provides utilities to help present and plot the result in different forms.</span>
 <span class="sd">    """</span>
 
-    <span class="c1"># pyre-fixme[3]: Return type must be annotated.</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span>
-        <span class="n">seq_attr</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
-        <span class="n">token_attr</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span>
-        <span class="n">input_tokens</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
-        <span class="n">output_tokens</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
-    <span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">seq_attr</span> <span class="o">=</span> <span class="n">seq_attr</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">token_attr</span> <span class="o">=</span> <span class="n">token_attr</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">input_tokens</span> <span class="o">=</span> <span class="n">input_tokens</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">output_tokens</span> <span class="o">=</span> <span class="n">output_tokens</span>
+    <span class="n">seq_attr</span><span class="p">:</span> <span class="n">Tensor</span>
+    <span class="n">token_attr</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span>
+    <span class="n">input_tokens</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+    <span class="n">output_tokens</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
 
     <span class="nd">@property</span>
-    <span class="c1"># pyre-fixme[3]: Return type must be annotated.</span>
-    <span class="k">def</span> <span class="nf">seq_attr_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">seq_attr_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
         <span class="k">return</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">v</span><span class="p">,</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">seq_attr</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_tokens</span><span class="p">)}</span>
 
-    <span class="c1"># pyre-fixme[3]: Return type must be annotated.</span>
-    <span class="c1"># pyre-fixme[2]: Parameter must be annotated.</span>
 <div class="viewcode-block" id="LLMAttributionResult.plot_token_attr">
 <a class="viewcode-back" href="../../../../llm_attr.html#captum.attr.LLMAttributionResult.plot_token_attr">[docs]</a>
-    <span class="k">def</span> <span class="nf">plot_token_attr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">show</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">plot_token_attr</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">show</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">plt</span><span class="o">.</span><span class="n">Figure</span><span class="p">,</span> <span class="n">plt</span><span class="o">.</span><span class="n">Axes</span><span class="p">]]:</span>
 <span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Generate a matplotlib plot for visualising the attribution</span>
 <span class="sd">        of the output tokens.</span>
@@ -97,7 +108,11 @@ src="/_sphinx/documentation_options.js"></script>
 <span class="sd">                Default: False</span>
 <span class="sd">        """</span>
 
-        <span class="c1"># pyre-fixme[16]: `Optional` has no attribute `cpu`.</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">token_attr</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"token_attr is None (no token-level attribution was performed), please "</span>
+                <span class="s2">"use plot_seq_attr instead for the sequence-level attribution plot"</span>
+            <span class="p">)</span>
         <span class="n">token_attr</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">token_attr</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span>
 
         <span class="c1"># maximum absolute attribution value</span>
@@ -107,26 +122,47 @@ src="/_sphinx/documentation_options.js"></script>
 
         <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">()</span>
 
+        <span class="c1"># Hide the grid</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+
         <span class="c1"># Plot the heatmap</span>
         <span class="n">data</span> <span class="o">=</span> <span class="n">token_attr</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
 
         <span class="n">fig</span><span class="o">.</span><span class="n">set_size_inches</span><span class="p">(</span>
             <span class="nb">max</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="mf">1.3</span><span class="p">,</span> <span class="mf">6.4</span><span class="p">),</span> <span class="nb">max</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="mf">2.5</span><span class="p">,</span> <span class="mf">4.8</span><span class="p">)</span>
         <span class="p">)</span>
+        <span class="n">colors</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s2">"#93003a"</span><span class="p">,</span>
+            <span class="s2">"#d0365b"</span><span class="p">,</span>
+            <span class="s2">"#f57789"</span><span class="p">,</span>
+            <span class="s2">"#ffbdc3"</span><span class="p">,</span>
+            <span class="s2">"#ffffff"</span><span class="p">,</span>
+            <span class="s2">"#a4d6e1"</span><span class="p">,</span>
+            <span class="s2">"#73a3ca"</span><span class="p">,</span>
+            <span class="s2">"#4772b3"</span><span class="p">,</span>
+            <span class="s2">"#00429d"</span><span class="p">,</span>
+        <span class="p">]</span>
+
         <span class="n">im</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span>
             <span class="n">data</span><span class="p">,</span>
             <span class="n">vmax</span><span class="o">=</span><span class="n">max_abs_attr_val</span><span class="p">,</span>
             <span class="n">vmin</span><span class="o">=-</span><span class="n">max_abs_attr_val</span><span class="p">,</span>
-            <span class="n">cmap</span><span class="o">=</span><span class="s2">"RdYlGn"</span><span class="p">,</span>
+            <span class="n">cmap</span><span class="o">=</span><span class="n">mcolors</span><span class="o">.</span><span class="n">LinearSegmentedColormap</span><span class="o">.</span><span class="n">from_list</span><span class="p">(</span>
+                <span class="n">name</span><span class="o">=</span><span class="s2">"colors"</span><span class="p">,</span> <span class="n">colors</span><span class="o">=</span><span class="n">colors</span>
+            <span class="p">),</span>
             <span class="n">aspect</span><span class="o">=</span><span class="s2">"auto"</span><span class="p">,</span>
         <span class="p">)</span>
+        <span class="n">fig</span><span class="o">.</span><span class="n">set_facecolor</span><span class="p">(</span><span class="s2">"white"</span><span class="p">)</span>
 
         <span class="c1"># Create colorbar</span>
-        <span class="n">cbar</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">figure</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
-        <span class="n">cbar</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">"Token Attribuiton"</span><span class="p">,</span> <span class="n">rotation</span><span class="o">=-</span><span class="mi">90</span><span class="p">,</span> <span class="n">va</span><span class="o">=</span><span class="s2">"bottom"</span><span class="p">)</span>
+        <span class="n">cbar</span> <span class="o">=</span> <span class="n">fig</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
+        <span class="n">cbar</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">"Token Attribution"</span><span class="p">,</span> <span class="n">rotation</span><span class="o">=-</span><span class="mi">90</span><span class="p">,</span> <span class="n">va</span><span class="o">=</span><span class="s2">"bottom"</span><span class="p">)</span>
 
         <span class="c1"># Show all ticks and label them with the respective list entries.</span>
-        <span class="n">ax</span><span class="o">.</span><span class="n">set_xticks</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span> <span class="n">labels</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">input_tokens</span><span class="p">)</span>
+        <span class="n">shortened_tokens</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">shorten</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">placeholder</span><span class="o">=</span><span class="s2">"..."</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_tokens</span>
+        <span class="p">]</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_xticks</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span> <span class="n">labels</span><span class="o">=</span><span class="n">shortened_tokens</span><span class="p">)</span>
         <span class="n">ax</span><span class="o">.</span><span class="n">set_yticks</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> <span class="n">labels</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">output_tokens</span><span class="p">)</span>
 
         <span class="c1"># Let the horizontal axes labeling appear on top.</span>
@@ -152,15 +188,16 @@ src="/_sphinx/documentation_options.js"></script>
 
         <span class="k">if</span> <span class="n">show</span><span class="p">:</span>
             <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+            <span class="k">return</span> <span class="kc">None</span>  <span class="c1"># mypy wants this</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span></div>
 
 
-    <span class="c1"># pyre-fixme[3]: Return type must be annotated.</span>
-    <span class="c1"># pyre-fixme[2]: Parameter must be annotated.</span>
 <div class="viewcode-block" id="LLMAttributionResult.plot_seq_attr">
 <a class="viewcode-back" href="../../../../llm_attr.html#captum.attr.LLMAttributionResult.plot_seq_attr">[docs]</a>
-    <span class="k">def</span> <span class="nf">plot_seq_attr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">show</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">plot_seq_attr</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">show</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">plt</span><span class="o">.</span><span class="n">Figure</span><span class="p">,</span> <span class="n">plt</span><span class="o">.</span><span class="n">Axes</span><span class="p">]]:</span>
 <span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Generate a matplotlib plot for visualising the attribution</span>
 <span class="sd">        of the output sequence.</span>
@@ -174,34 +211,280 @@ src="/_sphinx/documentation_options.js"></script>
 
         <span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">seq_attr</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
 
-        <span class="n">ax</span><span class="o">.</span><span class="n">set_xticks</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> <span class="n">labels</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">input_tokens</span><span class="p">)</span>
+        <span class="n">fig</span><span class="o">.</span><span class="n">set_size_inches</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="mi">2</span><span class="p">,</span> <span class="mf">6.4</span><span class="p">),</span> <span class="nb">max</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="mi">4</span><span class="p">,</span> <span class="mf">4.8</span><span class="p">))</span>
+
+        <span class="n">shortened_tokens</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">shorten</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">placeholder</span><span class="o">=</span><span class="s2">"..."</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_tokens</span>
+        <span class="p">]</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_xticks</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> <span class="n">labels</span><span class="o">=</span><span class="n">shortened_tokens</span><span class="p">)</span>
 
         <span class="n">ax</span><span class="o">.</span><span class="n">tick_params</span><span class="p">(</span><span class="n">top</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">bottom</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">labeltop</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">labelbottom</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 
-        <span class="n">plt</span><span class="o">.</span><span class="n">setp</span><span class="p">(</span><span class="n">ax</span><span class="o">.</span><span class="n">get_xticklabels</span><span class="p">(),</span> <span class="n">rotation</span><span class="o">=-</span><span class="mi">30</span><span class="p">,</span> <span class="n">ha</span><span class="o">=</span><span class="s2">"right"</span><span class="p">,</span> <span class="n">rotation_mode</span><span class="o">=</span><span class="s2">"anchor"</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">setp</span><span class="p">(</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">get_xticklabels</span><span class="p">(),</span>
+            <span class="n">rotation</span><span class="o">=-</span><span class="mi">30</span><span class="p">,</span>
+            <span class="n">ha</span><span class="o">=</span><span class="s2">"right"</span><span class="p">,</span>
+            <span class="n">rotation_mode</span><span class="o">=</span><span class="s2">"anchor"</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">fig</span><span class="o">.</span><span class="n">set_facecolor</span><span class="p">(</span><span class="s2">"white"</span><span class="p">)</span>
 
         <span class="c1"># pos bar</span>
         <span class="n">ax</span><span class="o">.</span><span class="n">bar</span><span class="p">(</span>
-            <span class="nb">range</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> <span class="p">[</span><span class="nb">max</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">data</span><span class="p">],</span> <span class="n">align</span><span class="o">=</span><span class="s2">"center"</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">"g"</span>
+            <span class="nb">range</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>
+            <span class="p">[</span><span class="nb">max</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">data</span><span class="p">],</span>
+            <span class="n">align</span><span class="o">=</span><span class="s2">"center"</span><span class="p">,</span>
+            <span class="n">color</span><span class="o">=</span><span class="s2">"#4772b3"</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="c1"># neg bar</span>
         <span class="n">ax</span><span class="o">.</span><span class="n">bar</span><span class="p">(</span>
-            <span class="nb">range</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> <span class="p">[</span><span class="nb">min</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">data</span><span class="p">],</span> <span class="n">align</span><span class="o">=</span><span class="s2">"center"</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">"r"</span>
+            <span class="nb">range</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>
+            <span class="p">[</span><span class="nb">min</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">data</span><span class="p">],</span>
+            <span class="n">align</span><span class="o">=</span><span class="s2">"center"</span><span class="p">,</span>
+            <span class="n">color</span><span class="o">=</span><span class="s2">"#d0365b"</span><span class="p">,</span>
         <span class="p">)</span>
 
-        <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">"Sequence Attribuiton"</span><span class="p">,</span> <span class="n">rotation</span><span class="o">=</span><span class="mi">90</span><span class="p">,</span> <span class="n">va</span><span class="o">=</span><span class="s2">"bottom"</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">"Sequence Attribution"</span><span class="p">,</span> <span class="n">rotation</span><span class="o">=</span><span class="mi">90</span><span class="p">,</span> <span class="n">va</span><span class="o">=</span><span class="s2">"bottom"</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">show</span><span class="p">:</span>
             <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+            <span class="k">return</span> <span class="kc">None</span>  <span class="c1"># mypy wants this</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span></div>
 </div>
 
 
 
+<span class="k">def</span> <span class="nf">_clean_up_pretty_token</span><span class="p">(</span><span class="n">token</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Remove newlines and leading/trailing whitespace from token."""</span>
+    <span class="k">return</span> <span class="n">token</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">,</span> <span class="s2">"</span><span class="se">\\</span><span class="s2">n"</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+
+
+<span class="k">def</span> <span class="nf">_encode_with_offsets</span><span class="p">(</span>
+    <span class="n">txt</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">tokenizer</span><span class="p">:</span> <span class="n">TokenizerLike</span><span class="p">,</span>
+    <span class="n">add_special_tokens</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]]:</span>
+    <span class="n">enc</span> <span class="o">=</span> <span class="n">tokenizer</span><span class="p">(</span>
+        <span class="n">txt</span><span class="p">,</span>
+        <span class="n">return_offsets_mapping</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">add_special_tokens</span><span class="o">=</span><span class="n">add_special_tokens</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">input_ids</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="n">enc</span><span class="p">[</span><span class="s2">"input_ids"</span><span class="p">])</span>
+    <span class="n">offset_mapping</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]],</span> <span class="n">enc</span><span class="p">[</span><span class="s2">"offset_mapping"</span><span class="p">])</span>
+    <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">input_ids</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">offset_mapping</span><span class="p">),</span> <span class="p">(</span>
+        <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">input_ids</span><span class="p">)</span><span class="si">}</span><span class="s2"> != </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">offset_mapping</span><span class="p">)</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">txt</span><span class="si">}</span><span class="s2"> -&gt; "</span>
+        <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">input_ids</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">offset_mapping</span><span class="si">}</span><span class="s2">"</span>
+    <span class="p">)</span>
+    <span class="c1"># For the case where offsets are not set properly (the end and start are</span>
+    <span class="c1"># equal for all tokens - fall back on the start of the next span in the</span>
+    <span class="c1"># offset mapping)</span>
+    <span class="n">offset_mapping_corrected</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">offset_mapping</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">start</span> <span class="o">==</span> <span class="n">end</span><span class="p">:</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">offset_mapping</span><span class="p">):</span>
+                <span class="n">end</span> <span class="o">=</span> <span class="n">offset_mapping</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">end</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">txt</span><span class="p">)</span>
+        <span class="n">offset_mapping_corrected</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">input_ids</span><span class="p">,</span> <span class="n">offset_mapping_corrected</span>
+
+
+<span class="k">def</span> <span class="nf">_convert_ids_to_pretty_tokens</span><span class="p">(</span>
+    <span class="n">ids</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">tokenizer</span><span class="p">:</span> <span class="n">TokenizerLike</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Convert ids to tokens without ugly unicode characters (e.g., Ġ). See:</span>
+<span class="sd">    https://github.com/huggingface/transformers/issues/4786 and</span>
+<span class="sd">    https://discuss.huggingface.co/t/bpe-tokenizers-and-spaces-before-words/475/2</span>
+
+<span class="sd">    This is the preferred function over tokenizer.convert_ids_to_tokens() for</span>
+<span class="sd">    user-facing data.</span>
+
+<span class="sd">    Quote from links:</span>
+<span class="sd">    &gt; Spaces are converted in a special character (the Ġ) in the tokenizer prior to</span>
+<span class="sd">    &gt; BPE splitting mostly to avoid digesting spaces since the standard BPE algorithm</span>
+<span class="sd">    &gt; used spaces in its process</span>
+<span class="sd">    """</span>
+    <span class="n">txt</span> <span class="o">=</span> <span class="n">tokenizer</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">ids</span><span class="p">)</span>
+    <span class="n">input_ids</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="c1"># Don't add special tokens (they're either already there, or we don't want them)</span>
+    <span class="n">input_ids</span><span class="p">,</span> <span class="n">offset_mapping</span> <span class="o">=</span> <span class="n">_encode_with_offsets</span><span class="p">(</span>
+        <span class="n">txt</span><span class="p">,</span> <span class="n">tokenizer</span><span class="p">,</span> <span class="n">add_special_tokens</span><span class="o">=</span><span class="kc">False</span>
+    <span class="p">)</span>
+
+    <span class="n">pretty_tokens</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">end_prev</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+    <span class="n">idx</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">offset</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">offset_mapping</span><span class="p">):</span>
+        <span class="n">start</span><span class="p">,</span> <span class="n">end</span> <span class="o">=</span> <span class="n">offset</span>
+        <span class="k">if</span> <span class="n">input_ids</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">!=</span> <span class="n">ids</span><span class="p">[</span><span class="n">idx</span><span class="p">]:</span>
+            <span class="c1"># When the re-encoded string doesn't match the original encoding we skip</span>
+            <span class="c1"># this token and hope for the best, falling back on a naive method. This</span>
+            <span class="c1"># can happen when a tokenizer might add a token that corresponds to</span>
+            <span class="c1"># a space only when add_special_tokens=False.</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"(i=</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">, idx=</span><span class="si">{</span><span class="n">idx</span><span class="si">}</span><span class="s2">) input_ids[i] </span><span class="si">{</span><span class="n">input_ids</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="si">}</span><span class="s2"> != ids[idx] "</span>
+                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ids</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span><span class="si">}</span><span class="s2"> (corresponding to text: </span><span class="si">{</span><span class="nb">repr</span><span class="p">(</span><span class="n">txt</span><span class="p">[</span><span class="n">start</span><span class="p">:</span><span class="n">end</span><span class="p">])</span><span class="si">}</span><span class="s2">). "</span>
+                <span class="s2">"Skipping this token."</span><span class="p">,</span>
+                <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">continue</span>
+        <span class="n">pretty_tokens</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="n">_clean_up_pretty_token</span><span class="p">(</span><span class="n">txt</span><span class="p">[</span><span class="n">start</span><span class="p">:</span><span class="n">end</span><span class="p">])</span>
+            <span class="o">+</span> <span class="p">(</span><span class="s2">" [OVERLAP]"</span> <span class="k">if</span> <span class="n">end_prev</span> <span class="o">&gt;</span> <span class="n">start</span> <span class="k">else</span> <span class="s2">""</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">end_prev</span> <span class="o">=</span> <span class="n">end</span>
+        <span class="n">idx</span> <span class="o">+=</span> <span class="mi">1</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">pretty_tokens</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">ids</span><span class="p">):</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"Pretty tokens length </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">pretty_tokens</span><span class="p">)</span><span class="si">}</span><span class="s2"> != ids length </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">ids</span><span class="p">)</span><span class="si">}</span><span class="s2">! "</span>
+            <span class="s2">"Falling back to naive decoding logic."</span><span class="p">,</span>
+            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">_convert_ids_to_pretty_tokens_fallback</span><span class="p">(</span><span class="n">ids</span><span class="p">,</span> <span class="n">tokenizer</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">pretty_tokens</span>
+
+
+<span class="k">def</span> <span class="nf">_convert_ids_to_pretty_tokens_fallback</span><span class="p">(</span>
+    <span class="n">ids</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">tokenizer</span><span class="p">:</span> <span class="n">TokenizerLike</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Fallback function that naively handles logic when multiple ids map to one string.</span>
+<span class="sd">    """</span>
+    <span class="n">pretty_tokens</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">idx</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">while</span> <span class="n">idx</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">ids</span><span class="p">):</span>
+        <span class="n">decoded</span> <span class="o">=</span> <span class="n">tokenizer</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">ids</span><span class="p">[</span><span class="n">idx</span><span class="p">])</span>
+        <span class="n">decoded_pretty</span> <span class="o">=</span> <span class="n">_clean_up_pretty_token</span><span class="p">(</span><span class="n">decoded</span><span class="p">)</span>
+        <span class="c1"># Handle case where single token (e.g. unicode) is split into multiple IDs</span>
+        <span class="c1"># NOTE: This logic will fail if a tokenizer splits a token into 3+ IDs</span>
+        <span class="k">if</span> <span class="n">decoded</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="o">==</span> <span class="s2">"�"</span> <span class="ow">and</span> <span class="n">tokenizer</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">decoded</span><span class="p">)</span> <span class="o">!=</span> <span class="p">[</span><span class="n">ids</span><span class="p">[</span><span class="n">idx</span><span class="p">]]:</span>
+            <span class="c1"># ID at idx is split, ensure next token is also from a split</span>
+            <span class="n">decoded_next</span> <span class="o">=</span> <span class="n">tokenizer</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">ids</span><span class="p">[</span><span class="n">idx</span> <span class="o">+</span> <span class="mi">1</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">decoded_next</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="o">==</span> <span class="s2">"�"</span> <span class="ow">and</span> <span class="n">tokenizer</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">decoded_next</span><span class="p">)</span> <span class="o">!=</span> <span class="p">[</span>
+                <span class="n">ids</span><span class="p">[</span><span class="n">idx</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
+            <span class="p">]:</span>
+                <span class="c1"># Both tokens are from a split, combine them</span>
+                <span class="n">decoded</span> <span class="o">=</span> <span class="n">tokenizer</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">ids</span><span class="p">[</span><span class="n">idx</span> <span class="p">:</span> <span class="n">idx</span> <span class="o">+</span> <span class="mi">2</span><span class="p">])</span>
+                <span class="n">pretty_tokens</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">decoded_pretty</span><span class="p">)</span>
+                <span class="n">pretty_tokens</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">decoded_pretty</span> <span class="o">+</span> <span class="s2">" [OVERLAP]"</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># Treat tokens as separate</span>
+                <span class="n">pretty_tokens</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">decoded_pretty</span><span class="p">)</span>
+                <span class="n">pretty_tokens</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">_clean_up_pretty_token</span><span class="p">(</span><span class="n">decoded_next</span><span class="p">))</span>
+            <span class="n">idx</span> <span class="o">+=</span> <span class="mi">2</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Just a normal token</span>
+            <span class="n">idx</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">pretty_tokens</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">decoded_pretty</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">pretty_tokens</span>
+
+
+<span class="k">class</span> <span class="nc">BaseLLMAttribution</span><span class="p">(</span><span class="n">Attribution</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Base class for LLM Attribution methods"""</span>
+
+    <span class="n">SUPPORTED_INPUTS</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Type</span><span class="p">[</span><span class="n">InterpretableInput</span><span class="p">],</span> <span class="o">...</span><span class="p">]</span>
+    <span class="n">SUPPORTED_METHODS</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Type</span><span class="p">[</span><span class="n">Attribution</span><span class="p">],</span> <span class="o">...</span><span class="p">]</span>
+
+    <span class="n">model</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span>
+    <span class="n">tokenizer</span><span class="p">:</span> <span class="n">TokenizerLike</span>
+    <span class="n">device</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">attr_method</span><span class="p">:</span> <span class="n">Attribution</span><span class="p">,</span>
+        <span class="n">tokenizer</span><span class="p">:</span> <span class="n">TokenizerLike</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="n">attr_method</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">SUPPORTED_METHODS</span>
+        <span class="p">),</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> does not support </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">attr_method</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
+
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">attr_method</span><span class="o">.</span><span class="n">forward_func</span><span class="p">)</span>
+
+        <span class="c1"># alias, we really need a model and don't support wrapper functions</span>
+        <span class="c1"># coz we need call model.forward, model.generate, etc.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">forward_func</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="p">:</span> <span class="n">TokenizerLike</span> <span class="o">=</span> <span class="n">tokenizer</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">cast</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="s2">"device"</span><span class="p">)</span>
+            <span class="k">else</span> <span class="nb">next</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">())</span><span class="o">.</span><span class="n">device</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_get_target_tokens</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">inp</span><span class="p">:</span> <span class="n">InterpretableInput</span><span class="p">,</span>
+        <span class="n">target</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">skip_tokens</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">gen_args</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="n">inp</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">SUPPORTED_INPUTS</span>
+        <span class="p">),</span> <span class="sa">f</span><span class="s2">"LLMAttribution does not support input type </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">inp</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
+
+        <span class="k">if</span> <span class="n">target</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># generate when None</span>
+            <span class="k">assert</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="s2">"generate"</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">callable</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">generate</span><span class="p">),</span> <span class="p">(</span>
+                <span class="s2">"The model does not have recognizable generate function."</span>
+                <span class="s2">"Target must be given for attribution"</span>
+            <span class="p">)</span>
+            <span class="n">generate_func</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">generate</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">gen_args</span><span class="p">:</span>
+                <span class="n">gen_args</span> <span class="o">=</span> <span class="n">DEFAULT_GEN_ARGS</span>
+
+            <span class="n">model_inp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_format_model_input</span><span class="p">(</span><span class="n">inp</span><span class="o">.</span><span class="n">to_model_input</span><span class="p">())</span>
+            <span class="n">output_tokens</span> <span class="o">=</span> <span class="n">generate_func</span><span class="p">(</span><span class="n">model_inp</span><span class="p">,</span> <span class="o">**</span><span class="n">gen_args</span><span class="p">)</span>
+            <span class="n">target_tokens</span> <span class="o">=</span> <span class="n">output_tokens</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">model_inp</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="p">:]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="n">gen_args</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">"gen_args must be None when target is given"</span>
+            <span class="c1"># Encode skip tokens</span>
+            <span class="k">if</span> <span class="n">skip_tokens</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">skip_tokens</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="nb">str</span><span class="p">):</span>
+                    <span class="n">skip_tokens</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">skip_tokens</span><span class="p">)</span>
+                    <span class="n">skip_tokens</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">convert_tokens_to_ids</span><span class="p">(</span><span class="n">skip_tokens</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">skip_tokens</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">skip_tokens</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="n">skip_tokens</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+                <span class="n">encoded</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">target</span><span class="p">)</span>
+                <span class="n">target_tokens</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span>
+                    <span class="p">[</span><span class="n">token</span> <span class="k">for</span> <span class="n">token</span> <span class="ow">in</span> <span class="n">encoded</span> <span class="k">if</span> <span class="n">token</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">skip_tokens</span><span class="p">]</span>
+                <span class="p">)</span>
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+                <span class="n">target_tokens</span> <span class="o">=</span> <span class="n">target</span><span class="p">[</span>
+                    <span class="o">~</span><span class="n">torch</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">skip_tokens</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">target</span><span class="o">.</span><span class="n">device</span><span class="p">))</span>
+                <span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                    <span class="s2">"target must either be str or Tensor, but the type of target is "</span>
+                    <span class="s2">"</span><span class="si">{}</span><span class="s2">"</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">target</span><span class="p">))</span>
+                <span class="p">)</span>
+        <span class="k">return</span> <span class="n">target_tokens</span>
+
+    <span class="k">def</span> <span class="nf">_format_model_input</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_input</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Convert str to tokenized tensor</span>
+<span class="sd">        to make LLMAttribution work with model inputs of both</span>
+<span class="sd">        raw text and text token tensors</span>
+<span class="sd">        """</span>
+        <span class="c1"># return tensor(1, n_tokens)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model_input</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">model_input</span><span class="p">,</span> <span class="n">return_tensors</span><span class="o">=</span><span class="s2">"pt"</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">device</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">model_input</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+
+
 <div class="viewcode-block" id="LLMAttribution">
 <a class="viewcode-back" href="../../../../llm_attr.html#captum.attr.LLMAttribution">[docs]</a>
-<span class="k">class</span> <span class="nc">LLMAttribution</span><span class="p">(</span><span class="n">Attribution</span><span class="p">):</span>
+<span class="k">class</span> <span class="nc">LLMAttribution</span><span class="p">(</span><span class="n">BaseLLMAttribution</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Attribution class for large language models. It wraps a perturbation-based</span>
 <span class="sd">    attribution algorthm to produce commonly interested attribution</span>
@@ -226,14 +509,12 @@ src="/_sphinx/documentation_options.js"></script>
     <span class="p">)</span>
     <span class="n">SUPPORTED_INPUTS</span> <span class="o">=</span> <span class="p">(</span><span class="n">TextTemplateInput</span><span class="p">,</span> <span class="n">TextTokenInput</span><span class="p">)</span>
 
-    <span class="c1"># pyre-fixme[3]: Return type must be annotated.</span>
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="n">attr_method</span><span class="p">:</span> <span class="n">Attribution</span><span class="p">,</span>
-        <span class="c1"># pyre-fixme[2]: Parameter must be annotated.</span>
-        <span class="n">tokenizer</span><span class="p">,</span>
+        <span class="n">attr_method</span><span class="p">:</span> <span class="n">PerturbationAttribution</span><span class="p">,</span>
+        <span class="n">tokenizer</span><span class="p">:</span> <span class="n">TokenizerLike</span><span class="p">,</span>
         <span class="n">attr_target</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"log_prob"</span><span class="p">,</span>  <span class="c1"># TODO: support callable attr_target</span>
-    <span class="p">):</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Args:</span>
 <span class="sd">            attr_method (Attribution): Instance of a supported perturbation attribution</span>
@@ -249,35 +530,15 @@ src="/_sphinx/documentation_options.js"></script>
 <span class="sd">                    Default: "log_prob"</span>
 <span class="sd">        """</span>
 
-        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span>
-            <span class="n">attr_method</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">SUPPORTED_METHODS</span>
-        <span class="p">),</span> <span class="sa">f</span><span class="s2">"LLMAttribution does not support </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">attr_method</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
-
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">attr_method</span><span class="o">.</span><span class="n">forward_func</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">attr_method</span><span class="p">,</span> <span class="n">tokenizer</span><span class="p">)</span>
 
         <span class="c1"># shallow copy is enough to avoid modifying original instance</span>
-        <span class="c1"># pyre-fixme[4]: Attribute must be annotated.</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">attr_method</span> <span class="o">=</span> <span class="n">copy</span><span class="p">(</span><span class="n">attr_method</span><span class="p">)</span>
-        <span class="c1"># pyre-fixme[4]: Attribute must be annotated.</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">include_per_token_attr</span> <span class="o">=</span> <span class="nb">isinstance</span><span class="p">(</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">attr_method</span><span class="p">:</span> <span class="n">PerturbationAttribution</span> <span class="o">=</span> <span class="n">copy</span><span class="p">(</span><span class="n">attr_method</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">include_per_token_attr</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="nb">isinstance</span><span class="p">(</span>
             <span class="n">attr_method</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">SUPPORTED_PER_TOKEN_ATTR_METHODS</span>
         <span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">attr_method</span><span class="o">.</span><span class="n">forward_func</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_forward_func</span>
-
-        <span class="c1"># alias, we really need a model and don't support wrapper functions</span>
-        <span class="c1"># coz we need call model.forward, model.generate, etc.</span>
-        <span class="c1"># pyre-fixme[4]: Attribute must be annotated.</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">forward_func</span><span class="p">)</span>
-
-        <span class="c1"># pyre-fixme[4]: Attribute must be annotated.</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span> <span class="o">=</span> <span class="n">tokenizer</span>
-        <span class="c1"># pyre-fixme[4]: Attribute must be annotated.</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="n">cast</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
-            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="s2">"device"</span><span class="p">)</span>
-            <span class="k">else</span> <span class="nb">next</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">())</span><span class="o">.</span><span class="n">device</span>
-        <span class="p">)</span>
 
         <span class="k">assert</span> <span class="n">attr_target</span> <span class="ow">in</span> <span class="p">(</span>
             <span class="s2">"log_prob"</span><span class="p">,</span>
@@ -285,41 +546,80 @@ src="/_sphinx/documentation_options.js"></script>
         <span class="p">),</span> <span class="s2">"attr_target should be either 'log_prob' or 'prob'"</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">attr_target</span> <span class="o">=</span> <span class="n">attr_target</span>
 
-    <span class="c1"># pyre-fixme[3]: Return type must be annotated.</span>
     <span class="k">def</span> <span class="nf">_forward_func</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="c1"># pyre-fixme[2]: Parameter must be annotated.</span>
-        <span class="n">perturbed_tensor</span><span class="p">,</span>
-        <span class="c1"># pyre-fixme[2]: Parameter must be annotated.</span>
-        <span class="n">inp</span><span class="p">,</span>
-        <span class="c1"># pyre-fixme[2]: Parameter must be annotated.</span>
-        <span class="n">target_tokens</span><span class="p">,</span>
-        <span class="c1"># pyre-fixme[2]: Parameter must be annotated.</span>
-        <span class="n">use_cached_outputs</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-        <span class="n">_inspect_forward</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="p">):</span>
+        <span class="n">perturbed_tensor</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">],</span>
+        <span class="n">inp</span><span class="p">:</span> <span class="n">InterpretableInput</span><span class="p">,</span>
+        <span class="n">target_tokens</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">use_cached_outputs</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">_inspect_forward</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">float</span><span class="p">]],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+        <span class="c1"># Lazily import transformers_typing to avoid importing transformers package if</span>
+        <span class="c1"># it isn't needed</span>
+        <span class="kn">from</span> <span class="nn">captum._utils.transformers_typing</span> <span class="kn">import</span> <span class="p">(</span>
+            <span class="n">Cache</span><span class="p">,</span>
+            <span class="n">DynamicCache</span><span class="p">,</span>
+            <span class="n">supports_caching</span><span class="p">,</span>
+            <span class="n">update_model_kwargs</span><span class="p">,</span>
+        <span class="p">)</span>
+
         <span class="n">perturbed_input</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_format_model_input</span><span class="p">(</span><span class="n">inp</span><span class="o">.</span><span class="n">to_model_input</span><span class="p">(</span><span class="n">perturbed_tensor</span><span class="p">))</span>
         <span class="n">init_model_inp</span> <span class="o">=</span> <span class="n">perturbed_input</span>
 
         <span class="n">model_inp</span> <span class="o">=</span> <span class="n">init_model_inp</span>
-        <span class="n">attention_mask</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">model_inp</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]])</span>
-        <span class="n">attention_mask</span> <span class="o">=</span> <span class="n">attention_mask</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">model_inp</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">attention_mask</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span>
+            <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="n">model_inp</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">long</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">model_inp</span><span class="o">.</span><span class="n">device</span>
+        <span class="p">)</span>
         <span class="n">model_kwargs</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"attention_mask"</span><span class="p">:</span> <span class="n">attention_mask</span><span class="p">}</span>
+        <span class="c1"># If applicable, update model kwargs for transformers models</span>
+        <span class="n">update_model_kwargs</span><span class="p">(</span>
+            <span class="n">model_kwargs</span><span class="o">=</span><span class="n">model_kwargs</span><span class="p">,</span>
+            <span class="n">model</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">,</span>
+            <span class="n">input_ids</span><span class="o">=</span><span class="n">model_inp</span><span class="p">,</span>
+            <span class="n">caching</span><span class="o">=</span><span class="n">use_cached_outputs</span><span class="p">,</span>
+        <span class="p">)</span>
 
-        <span class="n">log_prob_list</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">log_prob_list</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="n">outputs</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="k">for</span> <span class="n">target_token</span> <span class="ow">in</span> <span class="n">target_tokens</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">use_cached_outputs</span><span class="p">:</span>
                 <span class="k">if</span> <span class="n">outputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-                    <span class="n">model_kwargs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">_update_model_kwargs_for_generation</span><span class="p">(</span>
+                    <span class="c1"># If applicable, convert past_key_values to DynamicCache for</span>
+                    <span class="c1"># transformers models</span>
+                    <span class="k">if</span> <span class="p">(</span>
+                        <span class="n">Cache</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                        <span class="ow">and</span> <span class="n">DynamicCache</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                        <span class="ow">and</span> <span class="n">supports_caching</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">)</span>
+                        <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">outputs</span><span class="o">.</span><span class="n">past_key_values</span><span class="p">,</span> <span class="n">Cache</span><span class="p">)</span>
+                    <span class="p">):</span>
+                        <span class="n">outputs</span><span class="o">.</span><span class="n">past_key_values</span> <span class="o">=</span> <span class="n">DynamicCache</span><span class="o">.</span><span class="n">from_legacy_cache</span><span class="p">(</span>
+                            <span class="n">outputs</span><span class="o">.</span><span class="n">past_key_values</span>
+                        <span class="p">)</span>
+                    <span class="c1"># nn.Module typing suggests non-base attributes are modules or</span>
+                    <span class="c1"># tensors</span>
+                    <span class="n">_update_model_kwargs_for_generation</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span>
+                        <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">object</span><span class="p">]],</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">_update_model_kwargs_for_generation</span><span class="p">,</span>
+                    <span class="p">)</span>
+                    <span class="n">model_kwargs</span> <span class="o">=</span> <span class="n">_update_model_kwargs_for_generation</span><span class="p">(</span>  <span class="c1"># type: ignore</span>
                         <span class="n">outputs</span><span class="p">,</span> <span class="n">model_kwargs</span>
                     <span class="p">)</span>
-                <span class="n">model_inputs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">prepare_inputs_for_generation</span><span class="p">(</span>
+                <span class="c1"># nn.Module typing suggests non-base attributes are modules or tensors</span>
+                <span class="n">prep_inputs_for_generation</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span>
+                    <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">object</span><span class="p">]],</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">prepare_inputs_for_generation</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="n">model_inputs</span> <span class="o">=</span> <span class="n">prep_inputs_for_generation</span><span class="p">(</span>  <span class="c1"># type: ignore</span>
                     <span class="n">model_inp</span><span class="p">,</span> <span class="o">**</span><span class="n">model_kwargs</span>
                 <span class="p">)</span>
                 <span class="n">outputs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="o">**</span><span class="n">model_inputs</span><span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
-                <span class="n">outputs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">model_inp</span><span class="p">,</span> <span class="n">attention_mask</span><span class="o">=</span><span class="n">attention_mask</span><span class="p">)</span>
+                <span class="c1"># Update attention mask to adapt to input size change</span>
+                <span class="n">attention_mask</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span>
+                    <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="n">model_inp</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">long</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">model_inp</span><span class="o">.</span><span class="n">device</span>
+                <span class="p">)</span>
+                <span class="n">model_kwargs</span><span class="p">[</span><span class="s2">"attention_mask"</span><span class="p">]</span> <span class="o">=</span> <span class="n">attention_mask</span>
+                <span class="n">outputs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">model_inp</span><span class="p">,</span> <span class="o">**</span><span class="n">model_kwargs</span><span class="p">)</span>
             <span class="n">new_token_logits</span> <span class="o">=</span> <span class="n">outputs</span><span class="o">.</span><span class="n">logits</span><span class="p">[:,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span>
             <span class="n">log_probs</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">functional</span><span class="o">.</span><span class="n">log_softmax</span><span class="p">(</span><span class="n">new_token_logits</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 
@@ -329,7 +629,7 @@ src="/_sphinx/documentation_options.js"></script>
                 <span class="p">(</span><span class="n">model_inp</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([[</span><span class="n">target_token</span><span class="p">]])</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)),</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span>
             <span class="p">)</span>
 
-        <span class="n">total_log_prob</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">log_prob_list</span><span class="p">)</span>
+        <span class="n">total_log_prob</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span><span class="n">log_prob_list</span><span class="p">),</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
         <span class="c1"># 1st element is the total prob, rest are the target tokens</span>
         <span class="c1"># add a leading dim for batch even we only support single instance for now</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">include_per_token_attr</span><span class="p">:</span>
@@ -338,8 +638,6 @@ src="/_sphinx/documentation_options.js"></script>
             <span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">target_log_probs</span> <span class="o">=</span> <span class="n">total_log_prob</span>
-        <span class="c1"># pyre-fixme[6]: For 1st argument expected `Tensor` but got `Union[int,</span>
-        <span class="c1">#  Tensor]`.</span>
         <span class="n">target_probs</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">target_log_probs</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">_inspect_forward</span><span class="p">:</span>
@@ -351,37 +649,19 @@ src="/_sphinx/documentation_options.js"></script>
 
         <span class="k">return</span> <span class="n">target_probs</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">attr_target</span> <span class="o">!=</span> <span class="s2">"log_prob"</span> <span class="k">else</span> <span class="n">target_log_probs</span>
 
-    <span class="c1"># pyre-fixme[3]: Return type must be annotated.</span>
-    <span class="k">def</span> <span class="nf">_format_model_input</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_input</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">]):</span>
-<span class="w">        </span><span class="sd">"""</span>
-<span class="sd">        Convert str to tokenized tensor</span>
-<span class="sd">        to make LLMAttribution work with model inputs of both</span>
-<span class="sd">        raw text and text token tensors</span>
-<span class="sd">        """</span>
-        <span class="c1"># return tensor(1, n_tokens)</span>
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model_input</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">model_input</span><span class="p">,</span> <span class="n">return_tensors</span><span class="o">=</span><span class="s2">"pt"</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">device</span>
-            <span class="p">)</span>
-        <span class="k">return</span> <span class="n">model_input</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
-
 <div class="viewcode-block" id="LLMAttribution.attribute">
 <a class="viewcode-back" href="../../../../llm_attr.html#captum.attr.LLMAttribution.attribute">[docs]</a>
     <span class="k">def</span> <span class="nf">attribute</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">inp</span><span class="p">:</span> <span class="n">InterpretableInput</span><span class="p">,</span>
         <span class="n">target</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">skip_tokens</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">num_trials</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
-        <span class="c1"># pyre-fixme[24]: Generic type `dict` expects 2 type parameters, use</span>
-        <span class="c1">#  `typing.Dict[&lt;key type&gt;, &lt;value type&gt;]` to avoid runtime subscripting</span>
-        <span class="c1">#  errors.</span>
-        <span class="n">gen_args</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">gen_args</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">use_cached_outputs</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
         <span class="c1"># internal callback hook can be used for logging</span>
-        <span class="c1"># pyre-fixme[24]: Generic type `Callable` expects 2 type parameters.</span>
-        <span class="n">_inspect_forward</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="c1"># pyre-fixme[2]: Parameter must be annotated.</span>
-        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+        <span class="n">_inspect_forward</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">float</span><span class="p">]],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LLMAttributionResult</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Args:</span>
@@ -390,12 +670,19 @@ src="/_sphinx/documentation_options.js"></script>
 <span class="sd">                    which attributions are computed. If None, it uses the model</span>
 <span class="sd">                    to generate the target based on the input and gen_args.</span>
 <span class="sd">                    Default: None</span>
+<span class="sd">            skip_tokens (List[int] or List[str], optional): the tokens to skip in the</span>
+<span class="sd">                    the output's interpretable representation. Use this argument to</span>
+<span class="sd">                    define uninterested tokens, commonly like special tokens, e.g.,</span>
+<span class="sd">                    sos, and unk. It can be a list of strings of the tokens or a list</span>
+<span class="sd">                    of integers of the token ids.</span>
+<span class="sd">                    Default: None</span>
 <span class="sd">            num_trials (int, optional): number of trials to run. Return is the average</span>
-<span class="sd">                    attribibutions over all the trials.</span>
+<span class="sd">                    attributions over all the trials.</span>
 <span class="sd">                    Defaults: 1.</span>
 <span class="sd">            gen_args (dict, optional): arguments for generating the target. Only used if</span>
 <span class="sd">                    target is not given. When None, the default arguments are used,</span>
-<span class="sd">                    {"max_length": 25, "do_sample": False}</span>
+<span class="sd">                    {"max_new_tokens": 25, "do_sample": False,</span>
+<span class="sd">                    "temperature": None, "top_p": None}</span>
 <span class="sd">                    Defaults: None</span>
 <span class="sd">            **kwargs (Any): any extra keyword arguments passed to the call of the</span>
 <span class="sd">                    underlying attribute function of the given attribution instance</span>
@@ -405,37 +692,15 @@ src="/_sphinx/documentation_options.js"></script>
 <span class="sd">            attr (LLMAttributionResult): Attribution result. token_attr will be None</span>
 <span class="sd">                    if attr method is Lime or KernelShap.</span>
 <span class="sd">        """</span>
-
-        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span>
-            <span class="n">inp</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">SUPPORTED_INPUTS</span>
-        <span class="p">),</span> <span class="sa">f</span><span class="s2">"LLMAttribution does not support input type </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">inp</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
-
-        <span class="k">if</span> <span class="n">target</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="c1"># generate when None</span>
-            <span class="k">assert</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="s2">"generate"</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">callable</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">generate</span><span class="p">),</span> <span class="p">(</span>
-                <span class="s2">"The model does not have recognizable generate function."</span>
-                <span class="s2">"Target must be given for attribution"</span>
-            <span class="p">)</span>
-
-            <span class="k">if</span> <span class="ow">not</span> <span class="n">gen_args</span><span class="p">:</span>
-                <span class="n">gen_args</span> <span class="o">=</span> <span class="n">DEFAULT_GEN_ARGS</span>
-
-            <span class="n">model_inp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_format_model_input</span><span class="p">(</span><span class="n">inp</span><span class="o">.</span><span class="n">to_model_input</span><span class="p">())</span>
-            <span class="n">output_tokens</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span><span class="n">model_inp</span><span class="p">,</span> <span class="o">**</span><span class="n">gen_args</span><span class="p">)</span>
-            <span class="n">target_tokens</span> <span class="o">=</span> <span class="n">output_tokens</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">model_inp</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="p">:]</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">assert</span> <span class="n">gen_args</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">"gen_args must be None when target is given"</span>
-
-            <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">target</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">str</span><span class="p">:</span>
-                <span class="c1"># exclude sos</span>
-                <span class="n">target_tokens</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">target</span><span class="p">)[</span><span class="mi">1</span><span class="p">:]</span>
-                <span class="n">target_tokens</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">target_tokens</span><span class="p">)</span>
-            <span class="k">elif</span> <span class="nb">type</span><span class="p">(</span><span class="n">target</span><span class="p">)</span> <span class="ow">is</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
-                <span class="n">target_tokens</span> <span class="o">=</span> <span class="n">target</span>
+        <span class="n">target_tokens</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_target_tokens</span><span class="p">(</span>
+            <span class="n">inp</span><span class="p">,</span>
+            <span class="n">target</span><span class="p">,</span>
+            <span class="n">skip_tokens</span><span class="o">=</span><span class="n">skip_tokens</span><span class="p">,</span>
+            <span class="n">gen_args</span><span class="o">=</span><span class="n">gen_args</span><span class="p">,</span>
+        <span class="p">)</span>
 
         <span class="n">attr</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
             <span class="p">[</span>
-                <span class="c1"># pyre-fixme[61]: `target_tokens` is undefined, or not always defined.</span>
                 <span class="mi">1</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">target_tokens</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">include_per_token_attr</span> <span class="k">else</span> <span class="mi">1</span><span class="p">,</span>
                 <span class="n">inp</span><span class="o">.</span><span class="n">n_itp_features</span><span class="p">,</span>
             <span class="p">],</span>
@@ -450,8 +715,6 @@ src="/_sphinx/documentation_options.js"></script>
                 <span class="n">attr_input</span><span class="p">,</span>
                 <span class="n">additional_forward_args</span><span class="o">=</span><span class="p">(</span>
                     <span class="n">inp</span><span class="p">,</span>
-                    <span class="c1"># pyre-fixme[61]: `target_tokens` is undefined, or not always</span>
-                    <span class="c1">#  defined.</span>
                     <span class="n">target_tokens</span><span class="p">,</span>
                     <span class="n">use_cached_outputs</span><span class="p">,</span>
                     <span class="n">_inspect_forward</span><span class="p">,</span>
@@ -476,8 +739,18 @@ src="/_sphinx/documentation_options.js"></script>
                 <span class="n">attr</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">include_per_token_attr</span> <span class="k">else</span> <span class="kc">None</span>
             <span class="p">),</span>  <span class="c1"># shape(n_output_token, n_input_features)</span>
             <span class="n">inp</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
-            <span class="c1"># pyre-fixme[61]: `target_tokens` is undefined, or not always defined.</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">convert_ids_to_tokens</span><span class="p">(</span><span class="n">target_tokens</span><span class="p">),</span>
+            <span class="n">_convert_ids_to_pretty_tokens</span><span class="p">(</span><span class="n">target_tokens</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="p">),</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="LLMAttribution.attribute_future">
+<a class="viewcode-back" href="../../../../llm_attr.html#captum.attr.LLMAttribution.attribute_future">[docs]</a>
+    <span class="k">def</span> <span class="nf">attribute_future</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="n">LLMAttributionResult</span><span class="p">]:</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">"""</span>
+<span class="sd">        This method is not implemented for LLMAttribution.</span>
+<span class="sd">        """</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
+            <span class="s2">"attribute_future is not implemented for LLMAttribution"</span>
         <span class="p">)</span></div>
 </div>
 
@@ -485,7 +758,7 @@ src="/_sphinx/documentation_options.js"></script>
 
 <div class="viewcode-block" id="LLMGradientAttribution">
 <a class="viewcode-back" href="../../../../llm_attr.html#captum.attr.LLMGradientAttribution">[docs]</a>
-<span class="k">class</span> <span class="nc">LLMGradientAttribution</span><span class="p">(</span><span class="n">Attribution</span><span class="p">):</span>
+<span class="k">class</span> <span class="nc">LLMGradientAttribution</span><span class="p">(</span><span class="n">BaseLLMAttribution</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Attribution class for large language models. It wraps a gradient-based</span>
 <span class="sd">    attribution algorthm to produce commonly interested attribution</span>
@@ -498,17 +771,18 @@ src="/_sphinx/documentation_options.js"></script>
 <span class="sd">    and returns LLMAttributionResult</span>
 <span class="sd">    """</span>
 
-    <span class="n">SUPPORTED_METHODS</span> <span class="o">=</span> <span class="p">(</span><span class="n">LayerIntegratedGradients</span><span class="p">,)</span>
+    <span class="n">SUPPORTED_METHODS</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">LayerGradientShap</span><span class="p">,</span>
+        <span class="n">LayerGradientXActivation</span><span class="p">,</span>
+        <span class="n">LayerIntegratedGradients</span><span class="p">,</span>
+    <span class="p">)</span>
     <span class="n">SUPPORTED_INPUTS</span> <span class="o">=</span> <span class="p">(</span><span class="n">TextTokenInput</span><span class="p">,)</span>
 
-    <span class="c1"># pyre-fixme[3]: Return type must be annotated.</span>
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="c1"># pyre-fixme[2]: Parameter must be annotated.</span>
-        <span class="n">attr_method</span><span class="p">,</span>
-        <span class="c1"># pyre-fixme[2]: Parameter must be annotated.</span>
-        <span class="n">tokenizer</span><span class="p">,</span>
-    <span class="p">):</span>
+        <span class="n">attr_method</span><span class="p">:</span> <span class="n">GradientAttribution</span><span class="p">,</span>
+        <span class="n">tokenizer</span><span class="p">:</span> <span class="n">TokenizerLike</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Args:</span>
 <span class="sd">            attr_method (Attribution): instance of a supported perturbation attribution</span>
@@ -516,86 +790,22 @@ src="/_sphinx/documentation_options.js"></script>
 <span class="sd">                    interface convention</span>
 <span class="sd">            tokenizer (Tokenizer): tokenizer of the llm model used in the attr_method</span>
 <span class="sd">        """</span>
-        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span>
-            <span class="n">attr_method</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">SUPPORTED_METHODS</span>
-        <span class="p">),</span> <span class="sa">f</span><span class="s2">"LLMGradientAttribution does not support </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">attr_method</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
-
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">attr_method</span><span class="o">.</span><span class="n">forward_func</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">attr_method</span><span class="p">,</span> <span class="n">tokenizer</span><span class="p">)</span>
 
         <span class="c1"># shallow copy is enough to avoid modifying original instance</span>
-        <span class="c1"># pyre-fixme[4]: Attribute must be annotated.</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">attr_method</span> <span class="o">=</span> <span class="n">copy</span><span class="p">(</span><span class="n">attr_method</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">attr_method</span><span class="o">.</span><span class="n">forward_func</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_forward_func</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">attr_method</span><span class="p">:</span> <span class="n">GradientAttribution</span> <span class="o">=</span> <span class="n">copy</span><span class="p">(</span><span class="n">attr_method</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">attr_method</span><span class="o">.</span><span class="n">forward_func</span> <span class="o">=</span> <span class="n">GradientForwardFunc</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
 
-        <span class="c1"># alias, we really need a model and don't support wrapper functions</span>
-        <span class="c1"># coz we need call model.forward, model.generate, etc.</span>
-        <span class="c1"># pyre-fixme[4]: Attribute must be annotated.</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">forward_func</span><span class="p">)</span>
-
-        <span class="c1"># pyre-fixme[4]: Attribute must be annotated.</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span> <span class="o">=</span> <span class="n">tokenizer</span>
-        <span class="c1"># pyre-fixme[4]: Attribute must be annotated.</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="n">cast</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
-            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="s2">"device"</span><span class="p">)</span>
-            <span class="k">else</span> <span class="nb">next</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">())</span><span class="o">.</span><span class="n">device</span>
-        <span class="p">)</span>
-
-    <span class="c1"># pyre-fixme[3]: Return type must be annotated.</span>
-    <span class="k">def</span> <span class="nf">_forward_func</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span>
-        <span class="n">perturbed_tensor</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
-        <span class="n">inp</span><span class="p">:</span> <span class="n">InterpretableInput</span><span class="p">,</span>
-        <span class="n">target_tokens</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>  <span class="c1"># 1D tensor of target token ids</span>
-        <span class="n">cur_target_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>  <span class="c1"># current target index</span>
-    <span class="p">):</span>
-        <span class="n">perturbed_input</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_format_model_input</span><span class="p">(</span><span class="n">inp</span><span class="o">.</span><span class="n">to_model_input</span><span class="p">(</span><span class="n">perturbed_tensor</span><span class="p">))</span>
-
-        <span class="k">if</span> <span class="n">cur_target_idx</span><span class="p">:</span>
-            <span class="c1"># the input batch size can be expanded by attr method</span>
-            <span class="n">output_token_tensor</span> <span class="o">=</span> <span class="p">(</span>
-                <span class="n">target_tokens</span><span class="p">[:</span><span class="n">cur_target_idx</span><span class="p">]</span>
-                <span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
-                <span class="o">.</span><span class="n">expand</span><span class="p">(</span><span class="n">perturbed_input</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
-                <span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
-            <span class="p">)</span>
-            <span class="n">new_input_tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="n">perturbed_input</span><span class="p">,</span> <span class="n">output_token_tensor</span><span class="p">],</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">new_input_tensor</span> <span class="o">=</span> <span class="n">perturbed_input</span>
-
-        <span class="n">output_logits</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">(</span><span class="n">new_input_tensor</span><span class="p">)</span>
-
-        <span class="n">new_token_logits</span> <span class="o">=</span> <span class="n">output_logits</span><span class="o">.</span><span class="n">logits</span><span class="p">[:,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span>
-        <span class="n">log_probs</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">functional</span><span class="o">.</span><span class="n">log_softmax</span><span class="p">(</span><span class="n">new_token_logits</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
-
-        <span class="n">target_token</span> <span class="o">=</span> <span class="n">target_tokens</span><span class="p">[</span><span class="n">cur_target_idx</span><span class="p">]</span>
-        <span class="n">token_log_probs</span> <span class="o">=</span> <span class="n">log_probs</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">target_token</span><span class="p">]</span>
-
-        <span class="c1"># the attribution target is limited to the log probability</span>
-        <span class="k">return</span> <span class="n">token_log_probs</span>
-
-    <span class="c1"># pyre-fixme[3]: Return type must be annotated.</span>
-    <span class="c1"># pyre-fixme[2]: Parameter must be annotated.</span>
-    <span class="k">def</span> <span class="nf">_format_model_input</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_input</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">"""</span>
-<span class="sd">        Convert str to tokenized tensor</span>
-<span class="sd">        """</span>
-        <span class="k">return</span> <span class="n">model_input</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
-
-    <span class="c1"># pyre-fixme[3]: Return type must be annotated.</span>
 <div class="viewcode-block" id="LLMGradientAttribution.attribute">
 <a class="viewcode-back" href="../../../../llm_attr.html#captum.attr.LLMGradientAttribution.attribute">[docs]</a>
     <span class="k">def</span> <span class="nf">attribute</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">inp</span><span class="p">:</span> <span class="n">InterpretableInput</span><span class="p">,</span>
         <span class="n">target</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="c1"># pyre-fixme[24]: Generic type `dict` expects 2 type parameters, use</span>
-        <span class="c1">#  `typing.Dict[&lt;key type&gt;, &lt;value type&gt;]` to avoid runtime subscripting</span>
-        <span class="c1">#  errors.</span>
-        <span class="n">gen_args</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="c1"># pyre-fixme[2]: Parameter must be annotated.</span>
-        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
-    <span class="p">):</span>
+        <span class="n">skip_tokens</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">gen_args</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LLMAttributionResult</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Args:</span>
 <span class="sd">            inp (InterpretableInput): input prompt for which attributions are computed</span>
@@ -603,9 +813,16 @@ src="/_sphinx/documentation_options.js"></script>
 <span class="sd">                    which attributions are computed. If None, it uses the model</span>
 <span class="sd">                    to generate the target based on the input and gen_args.</span>
 <span class="sd">                    Default: None</span>
+<span class="sd">            skip_tokens (List[int] or List[str], optional): the tokens to skip in the</span>
+<span class="sd">                    the output's interpretable representation. Use this argument to</span>
+<span class="sd">                    define uninterested tokens, commonly like special tokens, e.g.,</span>
+<span class="sd">                    sos, and unk. It can be a list of strings of the tokens or a list</span>
+<span class="sd">                    of integers of the token ids.</span>
+<span class="sd">                    Default: None</span>
 <span class="sd">            gen_args (dict, optional): arguments for generating the target. Only used if</span>
 <span class="sd">                    target is not given. When None, the default arguments are used,</span>
-<span class="sd">                    {"max_length": 25, "do_sample": False}</span>
+<span class="sd">                    {"max_new_tokens": 25, "do_sample": False,</span>
+<span class="sd">                    "temperature": None, "top_p": None}</span>
 <span class="sd">                    Defaults: None</span>
 <span class="sd">            **kwargs (Any): any extra keyword arguments passed to the call of the</span>
 <span class="sd">                    underlying attribute function of the given attribution instance</span>
@@ -614,51 +831,27 @@ src="/_sphinx/documentation_options.js"></script>
 
 <span class="sd">            attr (LLMAttributionResult): attribution result</span>
 <span class="sd">        """</span>
-
-        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span>
-            <span class="n">inp</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">SUPPORTED_INPUTS</span>
-        <span class="p">),</span> <span class="sa">f</span><span class="s2">"LLMGradAttribution does not support input type </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">inp</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
-
-        <span class="k">if</span> <span class="n">target</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="c1"># generate when None</span>
-            <span class="k">assert</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="s2">"generate"</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">callable</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">generate</span><span class="p">),</span> <span class="p">(</span>
-                <span class="s2">"The model does not have recognizable generate function."</span>
-                <span class="s2">"Target must be given for attribution"</span>
-            <span class="p">)</span>
-
-            <span class="k">if</span> <span class="ow">not</span> <span class="n">gen_args</span><span class="p">:</span>
-                <span class="n">gen_args</span> <span class="o">=</span> <span class="n">DEFAULT_GEN_ARGS</span>
-
-            <span class="n">model_inp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_format_model_input</span><span class="p">(</span><span class="n">inp</span><span class="o">.</span><span class="n">to_model_input</span><span class="p">())</span>
-            <span class="n">output_tokens</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span><span class="n">model_inp</span><span class="p">,</span> <span class="o">**</span><span class="n">gen_args</span><span class="p">)</span>
-            <span class="n">target_tokens</span> <span class="o">=</span> <span class="n">output_tokens</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">model_inp</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="p">:]</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">assert</span> <span class="n">gen_args</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">"gen_args must be None when target is given"</span>
-
-            <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">target</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">str</span><span class="p">:</span>
-                <span class="c1"># exclude sos</span>
-                <span class="n">target_tokens</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">target</span><span class="p">)[</span><span class="mi">1</span><span class="p">:]</span>
-                <span class="n">target_tokens</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">target_tokens</span><span class="p">)</span>
-            <span class="k">elif</span> <span class="nb">type</span><span class="p">(</span><span class="n">target</span><span class="p">)</span> <span class="ow">is</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
-                <span class="n">target_tokens</span> <span class="o">=</span> <span class="n">target</span>
+        <span class="n">target_tokens</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_target_tokens</span><span class="p">(</span>
+            <span class="n">inp</span><span class="p">,</span>
+            <span class="n">target</span><span class="p">,</span>
+            <span class="n">skip_tokens</span><span class="o">=</span><span class="n">skip_tokens</span><span class="p">,</span>
+            <span class="n">gen_args</span><span class="o">=</span><span class="n">gen_args</span><span class="p">,</span>
+        <span class="p">)</span>
 
         <span class="n">attr_inp</span> <span class="o">=</span> <span class="n">inp</span><span class="o">.</span><span class="n">to_tensor</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
 
         <span class="n">attr_list</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="c1"># pyre-fixme[61]: `target_tokens` is undefined, or not always defined.</span>
         <span class="k">for</span> <span class="n">cur_target_idx</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">target_tokens</span><span class="p">):</span>
             <span class="c1"># attr in shape(batch_size, input+output_len, emb_dim)</span>
             <span class="n">attr</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">attr_method</span><span class="o">.</span><span class="n">attribute</span><span class="p">(</span>
                 <span class="n">attr_inp</span><span class="p">,</span>
                 <span class="n">additional_forward_args</span><span class="o">=</span><span class="p">(</span>
                     <span class="n">inp</span><span class="p">,</span>
-                    <span class="c1"># pyre-fixme[61]: `target_tokens` is undefined, or not always</span>
-                    <span class="c1">#  defined.</span>
                     <span class="n">target_tokens</span><span class="p">,</span>
                     <span class="n">cur_target_idx</span><span class="p">,</span>
                 <span class="p">),</span>
                 <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
-            <span class="p">)</span>
+            <span class="p">)</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span>
             <span class="n">attr</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">attr</span><span class="p">)</span>
 
             <span class="c1"># will have the attr for previous output tokens</span>
@@ -680,7 +873,7 @@ src="/_sphinx/documentation_options.js"></script>
         <span class="c1"># it attributes to all the elements of the output of the specified layer</span>
         <span class="c1"># so we need special handling for the inp type which don't care all the elements</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">inp</span><span class="p">,</span> <span class="n">TextTokenInput</span><span class="p">)</span> <span class="ow">and</span> <span class="n">inp</span><span class="o">.</span><span class="n">itp_mask</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">itp_mask</span> <span class="o">=</span> <span class="n">inp</span><span class="o">.</span><span class="n">itp_mask</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+            <span class="n">itp_mask</span> <span class="o">=</span> <span class="n">inp</span><span class="o">.</span><span class="n">itp_mask</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">attr</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
             <span class="n">itp_mask</span> <span class="o">=</span> <span class="n">itp_mask</span><span class="o">.</span><span class="n">expand_as</span><span class="p">(</span><span class="n">attr</span><span class="p">)</span>
             <span class="n">attr</span> <span class="o">=</span> <span class="n">attr</span><span class="p">[</span><span class="n">itp_mask</span><span class="p">]</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">attr</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
 
@@ -693,11 +886,221 @@ src="/_sphinx/documentation_options.js"></script>
             <span class="n">seq_attr</span><span class="p">,</span>
             <span class="n">attr</span><span class="p">,</span>  <span class="c1"># shape(n_output_token, n_input_features)</span>
             <span class="n">inp</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
-            <span class="c1"># pyre-fixme[61]: `target_tokens` is undefined, or not always defined.</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">convert_ids_to_tokens</span><span class="p">(</span><span class="n">target_tokens</span><span class="p">),</span>
+            <span class="n">_convert_ids_to_pretty_tokens</span><span class="p">(</span><span class="n">target_tokens</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="p">),</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="LLMGradientAttribution.attribute_future">
+<a class="viewcode-back" href="../../../../llm_attr.html#captum.attr.LLMGradientAttribution.attribute_future">[docs]</a>
+    <span class="k">def</span> <span class="nf">attribute_future</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="n">LLMAttributionResult</span><span class="p">]:</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">"""</span>
+<span class="sd">        This method is not implemented for LLMGradientAttribution.</span>
+<span class="sd">        """</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
+            <span class="s2">"attribute_future is not implemented for LLMGradientAttribution"</span>
         <span class="p">)</span></div>
 </div>
 
+
+
+<span class="k">class</span> <span class="nc">GradientForwardFunc</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    A wrapper class for the forward function of a model in LLMGradientAttribution</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">attr</span><span class="p">:</span> <span class="n">LLMGradientAttribution</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">attr</span> <span class="o">=</span> <span class="n">attr</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">model</span>
+
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">perturbed_tensor</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">inp</span><span class="p">:</span> <span class="n">InterpretableInput</span><span class="p">,</span>
+        <span class="n">target_tokens</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>  <span class="c1"># 1D tensor of target token ids</span>
+        <span class="n">cur_target_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>  <span class="c1"># current target index</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+        <span class="n">perturbed_input</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">attr</span><span class="o">.</span><span class="n">_format_model_input</span><span class="p">(</span>
+            <span class="n">inp</span><span class="o">.</span><span class="n">to_model_input</span><span class="p">(</span><span class="n">perturbed_tensor</span><span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">cur_target_idx</span><span class="p">:</span>
+            <span class="c1"># the input batch size can be expanded by attr method</span>
+            <span class="n">output_token_tensor</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">target_tokens</span><span class="p">[:</span><span class="n">cur_target_idx</span><span class="p">]</span>
+                <span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+                <span class="o">.</span><span class="n">expand</span><span class="p">(</span><span class="n">perturbed_input</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+                <span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">attr</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+            <span class="p">)</span>
+            <span class="n">new_input_tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="n">perturbed_input</span><span class="p">,</span> <span class="n">output_token_tensor</span><span class="p">],</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">new_input_tensor</span> <span class="o">=</span> <span class="n">perturbed_input</span>
+
+        <span class="n">output_logits</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">(</span><span class="n">new_input_tensor</span><span class="p">)</span>
+
+        <span class="n">new_token_logits</span> <span class="o">=</span> <span class="n">output_logits</span><span class="o">.</span><span class="n">logits</span><span class="p">[:,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">log_probs</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">functional</span><span class="o">.</span><span class="n">log_softmax</span><span class="p">(</span><span class="n">new_token_logits</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="n">target_token</span> <span class="o">=</span> <span class="n">target_tokens</span><span class="p">[</span><span class="n">cur_target_idx</span><span class="p">]</span>
+        <span class="n">token_log_probs</span> <span class="o">=</span> <span class="n">log_probs</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">target_token</span><span class="p">]</span>
+
+        <span class="c1"># the attribution target is limited to the log probability</span>
+        <span class="k">return</span> <span class="n">token_log_probs</span>
+
+
+<span class="k">class</span> <span class="nc">_PlaceholderModel</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Simple placeholder model that can be used with</span>
+<span class="sd">    RemoteLLMAttribution without needing a real model.</span>
+<span class="sd">    This can be acheived by `lambda *_:0` but BaseLLMAttribution expects</span>
+<span class="sd">    `device`, so creating this class to set the device.</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">"cpu"</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">0</span>
+
+
+<span class="k">class</span> <span class="nc">RemoteLLMAttribution</span><span class="p">(</span><span class="n">LLMAttribution</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Attribution class for large language models</span>
+<span class="sd">    that are hosted remotely and offer logprob APIs.</span>
+<span class="sd">    """</span>
+
+    <span class="n">placeholder_model</span> <span class="o">=</span> <span class="n">_PlaceholderModel</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">attr_method</span><span class="p">:</span> <span class="n">PerturbationAttribution</span><span class="p">,</span>
+        <span class="n">tokenizer</span><span class="p">:</span> <span class="n">TokenizerLike</span><span class="p">,</span>
+        <span class="n">provider</span><span class="p">:</span> <span class="n">RemoteLLMProvider</span><span class="p">,</span>
+        <span class="n">attr_target</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"log_prob"</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Args:</span>
+<span class="sd">            attr_method: Instance of a supported perturbation attribution class</span>
+<span class="sd">            tokenizer (Tokenizer): tokenizer of the llm model used in the attr_method</span>
+<span class="sd">            provider: Remote LLM provider that implements the RemoteLLMProvider protocol</span>
+<span class="sd">            attr_target: attribute towards log probability or probability.</span>
+<span class="sd">                    Available values ["log_prob", "prob"]</span>
+<span class="sd">                    Default: "log_prob"</span>
+<span class="sd">        """</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
+            <span class="n">attr_method</span><span class="o">=</span><span class="n">attr_method</span><span class="p">,</span>
+            <span class="n">tokenizer</span><span class="o">=</span><span class="n">tokenizer</span><span class="p">,</span>
+            <span class="n">attr_target</span><span class="o">=</span><span class="n">attr_target</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">provider</span> <span class="o">=</span> <span class="n">provider</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">attr_method</span><span class="o">.</span><span class="n">forward_func</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_remote_forward_func</span>
+
+    <span class="k">def</span> <span class="nf">_get_target_tokens</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">inp</span><span class="p">:</span> <span class="n">InterpretableInput</span><span class="p">,</span>
+        <span class="n">target</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">skip_tokens</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">gen_args</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Get the target tokens for the remote LLM provider.</span>
+<span class="sd">        """</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="n">inp</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">SUPPORTED_INPUTS</span>
+        <span class="p">),</span> <span class="sa">f</span><span class="s2">"RemoteLLMAttribution does not support input type </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">inp</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
+
+        <span class="k">if</span> <span class="n">target</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># generate when None with remote provider</span>
+            <span class="k">assert</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">provider</span><span class="p">,</span> <span class="s2">"generate"</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">callable</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">provider</span><span class="o">.</span><span class="n">generate</span>
+            <span class="p">),</span> <span class="p">(</span>
+                <span class="s2">"The provider does not have generate function"</span>
+                <span class="s2">" for generating target sequence."</span>
+                <span class="s2">"Target must be given for attribution"</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">gen_args</span><span class="p">:</span>
+                <span class="n">gen_args</span> <span class="o">=</span> <span class="n">DEFAULT_GEN_ARGS</span>
+
+            <span class="n">model_inp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_format_remote_model_input</span><span class="p">(</span><span class="n">inp</span><span class="o">.</span><span class="n">to_model_input</span><span class="p">())</span>
+            <span class="n">target_str</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">provider</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span><span class="n">model_inp</span><span class="p">,</span> <span class="o">**</span><span class="n">gen_args</span><span class="p">)</span>
+            <span class="n">target_tokens</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span>
+                <span class="n">target_str</span><span class="p">,</span> <span class="n">return_tensors</span><span class="o">=</span><span class="s2">"pt"</span><span class="p">,</span> <span class="n">add_special_tokens</span><span class="o">=</span><span class="kc">False</span>
+            <span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">target_tokens</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">_get_target_tokens</span><span class="p">(</span>
+                <span class="n">inp</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">skip_tokens</span><span class="p">,</span> <span class="n">gen_args</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">target_tokens</span>
+
+    <span class="k">def</span> <span class="nf">_format_remote_model_input</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_input</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Format the model input for the remote LLM provider.</span>
+<span class="sd">        Convert tokenized tensor to str</span>
+<span class="sd">        to make RemoteLLMAttribution work with model inputs of both</span>
+<span class="sd">        raw text and text token tensors</span>
+<span class="sd">        """</span>
+        <span class="c1"># return str input</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model_input</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">model_input</span><span class="o">.</span><span class="n">flatten</span><span class="p">())</span>
+        <span class="k">return</span> <span class="n">model_input</span>
+
+    <span class="k">def</span> <span class="nf">_remote_forward_func</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">perturbed_tensor</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">],</span>
+        <span class="n">inp</span><span class="p">:</span> <span class="n">InterpretableInput</span><span class="p">,</span>
+        <span class="n">target_tokens</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">use_cached_outputs</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">_inspect_forward</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">float</span><span class="p">]],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Forward function for the remote LLM provider.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If the number of token logprobs doesn't match expected length</span>
+<span class="sd">        """</span>
+        <span class="n">perturbed_input</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_format_remote_model_input</span><span class="p">(</span>
+            <span class="n">inp</span><span class="o">.</span><span class="n">to_model_input</span><span class="p">(</span><span class="n">perturbed_tensor</span><span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="n">target_str</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">target_tokens</span><span class="p">)</span>
+
+        <span class="n">target_token_probs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">provider</span><span class="o">.</span><span class="n">get_logprobs</span><span class="p">(</span>
+            <span class="n">input_prompt</span><span class="o">=</span><span class="n">perturbed_input</span><span class="p">,</span>
+            <span class="n">target_str</span><span class="o">=</span><span class="n">target_str</span><span class="p">,</span>
+            <span class="n">tokenizer</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">target_token_probs</span><span class="p">)</span> <span class="o">!=</span> <span class="n">target_tokens</span><span class="o">.</span><span class="n">size</span><span class="p">()[</span><span class="mi">0</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"Number of token logprobs from provider (</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">target_token_probs</span><span class="p">)</span><span class="si">}</span><span class="s2">) "</span>
+                <span class="sa">f</span><span class="s2">"does not match expected target "</span>
+                <span class="sa">f</span><span class="s2">"token length (</span><span class="si">{</span><span class="n">target_tokens</span><span class="o">.</span><span class="n">size</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">)"</span>
+            <span class="p">)</span>
+
+        <span class="n">log_prob_list</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">,</span> <span class="n">target_token_probs</span><span class="p">))</span>
+
+        <span class="n">total_log_prob</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span><span class="n">log_prob_list</span><span class="p">),</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="c1"># 1st element is the total prob, rest are the target tokens</span>
+        <span class="c1"># add a leading dim for batch even we only support single instance for now</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">include_per_token_attr</span><span class="p">:</span>
+            <span class="n">target_log_probs</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span>
+                <span class="p">[</span><span class="n">total_log_prob</span><span class="p">,</span> <span class="o">*</span><span class="n">log_prob_list</span><span class="p">],</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span>
+            <span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">target_log_probs</span> <span class="o">=</span> <span class="n">total_log_prob</span>
+        <span class="n">target_probs</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">target_log_probs</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">_inspect_forward</span><span class="p">:</span>
+            <span class="n">prompt</span> <span class="o">=</span> <span class="n">perturbed_input</span>
+            <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">target_tokens</span><span class="p">)</span>
+
+            <span class="c1"># callback for externals to inspect (prompt, response, seq_prob)</span>
+            <span class="n">_inspect_forward</span><span class="p">(</span><span class="n">prompt</span><span class="p">,</span> <span class="n">response</span><span class="p">,</span> <span class="n">target_probs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">tolist</span><span class="p">())</span>
+
+        <span class="k">return</span> <span class="n">target_probs</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">attr_target</span> <span class="o">!=</span> <span class="s2">"log_prob"</span> <span class="k">else</span> <span class="n">target_log_probs</span>
 </pre></div>
 </div>
 </div>
@@ -746,7 +1149,7 @@ src="/_sphinx/documentation_options.js"></script>
 </div>
 </div>
 <div class="clearer"></div>
-</div></div></div><footer class="nav-footer" id="footer"><section class="sitemap"><div class="footerSection"><h5>Docs</h5><a href="/docs/introduction">Introduction</a><a href="/docs/getting_started">Getting Started</a><a href="/tutorials/">Tutorials</a><a href="/api/">API Reference</a></div><div class="footerSection"><h5>Legal</h5><a href="https://opensource.facebook.com/legal/privacy/" target="_blank" rel="noreferrer noopener">Privacy</a><a href="https://opensource.facebook.com/legal/terms/" target="_blank" rel="noreferrer noopener">Terms</a></div><div class="footerSection"><h5>Social</h5><div class="social"><a class="github-button" href="https://github.com/pytorch/captum" data-count-href="https://github.com/pytorch/captum/stargazers" data-show-count="true" data-count-aria-label="# stargazers on GitHub" aria-label="Star Captum on GitHub">captum</a></div></div></section><a href="https://opensource.facebook.com/" target="_blank" rel="noreferrer noopener" class="fbOpenSource"><img src="/img/oss_logo.png" alt="Facebook Open Source" width="170" height="45"/></a><section class="copyright"> Copyright © 2024 Facebook Inc.</section><script>
+</div></div></div><footer class="nav-footer" id="footer"><section class="sitemap"><div class="footerSection"><h5>Docs</h5><a href="/docs/introduction">Introduction</a><a href="/docs/getting_started">Getting Started</a><a href="/tutorials/">Tutorials</a><a href="/api/">API Reference</a></div><div class="footerSection"><h5>Legal</h5><a href="https://opensource.facebook.com/legal/privacy/" target="_blank" rel="noreferrer noopener">Privacy</a><a href="https://opensource.facebook.com/legal/terms/" target="_blank" rel="noreferrer noopener">Terms</a></div><div class="footerSection"><h5>Social</h5><div class="social"><a class="github-button" href="https://github.com/pytorch/captum" data-count-href="https://github.com/pytorch/captum/stargazers" data-show-count="true" data-count-aria-label="# stargazers on GitHub" aria-label="Star Captum on GitHub">captum</a></div></div></section><a href="https://opensource.facebook.com/" target="_blank" rel="noreferrer noopener" class="fbOpenSource"><img src="/img/oss_logo.png" alt="Facebook Open Source" width="170" height="45"/></a><section class="copyright"> Copyright © 2025 Facebook Inc.</section><script>
             (function() {
               var BAD_BASE = '/captum/';
               if (window.location.origin !== 'https://captum.ai') {

@@ -35,7 +35,18 @@ src="/_sphinx/documentation_options.js"></script>
 <span class="c1"># pyre-strict</span>
 <span class="kn">import</span> <span class="nn">functools</span>
 <span class="kn">import</span> <span class="nn">warnings</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">cast</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">overload</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">Any</span><span class="p">,</span>
+    <span class="n">Callable</span><span class="p">,</span>
+    <span class="n">cast</span><span class="p">,</span>
+    <span class="n">Dict</span><span class="p">,</span>
+    <span class="n">List</span><span class="p">,</span>
+    <span class="n">Literal</span><span class="p">,</span>
+    <span class="n">Optional</span><span class="p">,</span>
+    <span class="n">overload</span><span class="p">,</span>
+    <span class="n">Tuple</span><span class="p">,</span>
+    <span class="n">Union</span><span class="p">,</span>
+<span class="p">)</span>
 
 <span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">from</span> <span class="nn">captum._utils.common</span> <span class="kn">import</span> <span class="p">(</span>
@@ -44,7 +55,7 @@ src="/_sphinx/documentation_options.js"></script>
     <span class="n">_format_outputs</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="kn">from</span> <span class="nn">captum._utils.gradient</span> <span class="kn">import</span> <span class="n">_forward_layer_eval</span><span class="p">,</span> <span class="n">_run_forward</span>
-<span class="kn">from</span> <span class="nn">captum._utils.typing</span> <span class="kn">import</span> <span class="n">BaselineType</span><span class="p">,</span> <span class="n">Literal</span><span class="p">,</span> <span class="n">ModuleOrModuleList</span><span class="p">,</span> <span class="n">TargetType</span>
+<span class="kn">from</span> <span class="nn">captum._utils.typing</span> <span class="kn">import</span> <span class="n">BaselineType</span><span class="p">,</span> <span class="n">ModuleOrModuleList</span><span class="p">,</span> <span class="n">TargetType</span>
 <span class="kn">from</span> <span class="nn">captum.attr._core.integrated_gradients</span> <span class="kn">import</span> <span class="n">IntegratedGradients</span>
 <span class="kn">from</span> <span class="nn">captum.attr._utils.attribution</span> <span class="kn">import</span> <span class="n">GradientAttribution</span><span class="p">,</span> <span class="n">LayerAttribution</span>
 <span class="kn">from</span> <span class="nn">captum.attr._utils.common</span> <span class="kn">import</span> <span class="p">(</span>
@@ -54,6 +65,7 @@ src="/_sphinx/documentation_options.js"></script>
 <span class="p">)</span>
 <span class="kn">from</span> <span class="nn">captum.log</span> <span class="kn">import</span> <span class="n">log_usage</span>
 <span class="kn">from</span> <span class="nn">torch</span> <span class="kn">import</span> <span class="n">Tensor</span>
+<span class="kn">from</span> <span class="nn">torch.nn</span> <span class="kn">import</span> <span class="n">Module</span>
 <span class="kn">from</span> <span class="nn">torch.nn.parallel.scatter_gather</span> <span class="kn">import</span> <span class="n">scatter</span>
 
 
@@ -81,8 +93,7 @@ src="/_sphinx/documentation_options.js"></script>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="c1"># pyre-fixme[24]: Generic type `Callable` expects 2 type parameters.</span>
-        <span class="n">forward_func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
+        <span class="n">forward_func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">],</span>
         <span class="n">layer</span><span class="p">:</span> <span class="n">ModuleOrModuleList</span><span class="p">,</span>
         <span class="n">device_ids</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">multiply_by_inputs</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
@@ -143,60 +154,169 @@ src="/_sphinx/documentation_options.js"></script>
                 <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
             <span class="p">)</span>
 
+    <span class="k">def</span> <span class="nf">_make_gradient_func</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">num_outputs_cumsum</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">attribute_to_layer_input</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+        <span class="n">grad_kwargs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">]]:</span>
+
+        <span class="k">def</span> <span class="nf">_gradient_func</span><span class="p">(</span>
+            <span class="n">forward_fn</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">],</span>
+            <span class="n">inputs</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span>
+            <span class="n">target_ind</span><span class="p">:</span> <span class="n">TargetType</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="n">additional_forward_args</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">object</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">device_ids</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">device_ids</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">scattered_inputs</span> <span class="o">=</span> <span class="p">(</span><span class="n">inputs</span><span class="p">,)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># scatter method does not have a precise enough return type in its</span>
+                <span class="c1"># stub, so suppress the type warning.</span>
+                <span class="n">scattered_inputs</span> <span class="o">=</span> <span class="n">scatter</span><span class="p">(</span>  <span class="c1"># type:ignore</span>
+                    <span class="c1"># pyre-fixme[6]: For 1st argument expected `Tensor` but got</span>
+                    <span class="c1">#  `Union[Tensor, typing.Tuple[Tensor, ...]]`.</span>
+                    <span class="n">inputs</span><span class="p">,</span>
+                    <span class="n">target_gpus</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">device_ids</span><span class="p">,</span>
+                <span class="p">)</span>
+
+            <span class="n">scattered_inputs_dict</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="n">Union</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span>
+            <span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="n">scattered_input</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">device</span><span class="p">:</span> <span class="n">scattered_input</span>
+                <span class="k">for</span> <span class="n">scattered_input</span> <span class="ow">in</span> <span class="n">scattered_inputs</span>
+            <span class="p">}</span>
+
+            <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">autograd</span><span class="o">.</span><span class="n">set_grad_enabled</span><span class="p">(</span><span class="kc">True</span><span class="p">):</span>
+
+                <span class="k">def</span> <span class="nf">layer_forward_hook</span><span class="p">(</span>
+                    <span class="n">module</span><span class="p">:</span> <span class="n">Module</span><span class="p">,</span>
+                    <span class="n">hook_inputs</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span>
+                    <span class="n">hook_outputs</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+                    <span class="n">layer_idx</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">]]:</span>
+                    <span class="n">device</span> <span class="o">=</span> <span class="n">_extract_device</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">hook_inputs</span><span class="p">,</span> <span class="n">hook_outputs</span><span class="p">)</span>
+                    <span class="n">is_layer_tuple</span> <span class="o">=</span> <span class="p">(</span>
+                        <span class="nb">isinstance</span><span class="p">(</span><span class="n">hook_outputs</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span>
+                        <span class="c1"># hook_outputs is None if attribute_to_layer_input == True</span>
+                        <span class="k">if</span> <span class="n">hook_outputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                        <span class="k">else</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">hook_inputs</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span>
+                    <span class="p">)</span>
+
+                    <span class="k">if</span> <span class="n">is_layer_tuple</span><span class="p">:</span>
+                        <span class="k">return</span> <span class="n">cast</span><span class="p">(</span>
+                            <span class="n">Union</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span>
+                            <span class="n">scattered_inputs_dict</span><span class="p">[</span><span class="n">device</span><span class="p">][</span>
+                                <span class="n">num_outputs_cumsum</span><span class="p">[</span><span class="n">layer_idx</span><span class="p">]</span> <span class="p">:</span> <span class="n">num_outputs_cumsum</span><span class="p">[</span>
+                                    <span class="n">layer_idx</span> <span class="o">+</span> <span class="mi">1</span>
+                                <span class="p">]</span>
+                            <span class="p">],</span>
+                        <span class="p">)</span>
+
+                    <span class="k">return</span> <span class="n">scattered_inputs_dict</span><span class="p">[</span><span class="n">device</span><span class="p">][</span><span class="n">num_outputs_cumsum</span><span class="p">[</span><span class="n">layer_idx</span><span class="p">]]</span>
+
+                <span class="n">hooks</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">try</span><span class="p">:</span>
+
+                    <span class="n">layers</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">layer</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">layers</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+                        <span class="n">layers</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">layer</span><span class="p">]</span>
+
+                    <span class="k">for</span> <span class="n">layer_idx</span><span class="p">,</span> <span class="n">layer</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">layers</span><span class="p">):</span>
+                        <span class="n">hook</span> <span class="o">=</span> <span class="kc">None</span>
+                        <span class="c1"># TODO:</span>
+                        <span class="c1"># Allow multiple attribute_to_layer_input flags for</span>
+                        <span class="c1"># each layer, i.e. attribute_to_layer_input[layer_idx]</span>
+                        <span class="k">if</span> <span class="n">attribute_to_layer_input</span><span class="p">:</span>
+                            <span class="n">hook</span> <span class="o">=</span> <span class="n">layer</span><span class="o">.</span><span class="n">register_forward_pre_hook</span><span class="p">(</span>
+                                <span class="n">functools</span><span class="o">.</span><span class="n">partial</span><span class="p">(</span>
+                                    <span class="n">layer_forward_hook</span><span class="p">,</span> <span class="n">layer_idx</span><span class="o">=</span><span class="n">layer_idx</span>
+                                <span class="p">)</span>
+                            <span class="p">)</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">hook</span> <span class="o">=</span> <span class="n">layer</span><span class="o">.</span><span class="n">register_forward_hook</span><span class="p">(</span>
+                                <span class="n">functools</span><span class="o">.</span><span class="n">partial</span><span class="p">(</span>
+                                    <span class="n">layer_forward_hook</span><span class="p">,</span> <span class="n">layer_idx</span><span class="o">=</span><span class="n">layer_idx</span>
+                                <span class="p">)</span>
+                            <span class="p">)</span>
+
+                        <span class="n">hooks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">hook</span><span class="p">)</span>
+
+                    <span class="c1"># the inputs is an empty tuple</span>
+                    <span class="c1"># coz it is prepended into additional_forward_args</span>
+                    <span class="n">output</span> <span class="o">=</span> <span class="n">_run_forward</span><span class="p">(</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">forward_func</span><span class="p">,</span> <span class="p">(),</span> <span class="n">target_ind</span><span class="p">,</span> <span class="n">additional_forward_args</span>
+                    <span class="p">)</span>
+                <span class="k">finally</span><span class="p">:</span>
+                    <span class="k">for</span> <span class="n">hook</span> <span class="ow">in</span> <span class="n">hooks</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="n">hook</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                            <span class="n">hook</span><span class="o">.</span><span class="n">remove</span><span class="p">()</span>
+
+                <span class="c1"># _run_forward may return future of Tensor,</span>
+                <span class="c1"># but we don't support it here now</span>
+                <span class="c1"># And it will fail before here.</span>
+                <span class="n">output</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">output</span><span class="p">)</span>
+                <span class="k">assert</span> <span class="n">output</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span> <span class="o">==</span> <span class="mi">1</span><span class="p">,</span> <span class="p">(</span>
+                    <span class="s2">"Target not provided when necessary, cannot"</span>
+                    <span class="s2">" take gradient with respect to multiple outputs."</span>
+                <span class="p">)</span>
+                <span class="c1"># torch.unbind(forward_out) is a list of scalar tensor tuples and</span>
+                <span class="c1"># contains batch_size * #steps elements</span>
+                <span class="n">grads</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">autograd</span><span class="o">.</span><span class="n">grad</span><span class="p">(</span>
+                    <span class="n">torch</span><span class="o">.</span><span class="n">unbind</span><span class="p">(</span><span class="n">output</span><span class="p">),</span> <span class="n">inputs</span><span class="p">,</span> <span class="o">**</span><span class="n">grad_kwargs</span> <span class="ow">or</span> <span class="p">{}</span>
+                <span class="p">)</span>
+            <span class="k">return</span> <span class="n">grads</span>
+
+        <span class="k">return</span> <span class="n">_gradient_func</span>
+
     <span class="nd">@overload</span>
-    <span class="c1"># pyre-fixme[43]: The implementation of `attribute` does not accept all possible</span>
-    <span class="c1">#  arguments of overload defined on line `112`.</span>
+    <span class="nd">@log_usage</span><span class="p">(</span><span class="n">part_of_slo</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="k">def</span> <span class="nf">attribute</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">inputs</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span>
         <span class="n">baselines</span><span class="p">:</span> <span class="n">BaselineType</span><span class="p">,</span>
         <span class="n">target</span><span class="p">:</span> <span class="n">TargetType</span><span class="p">,</span>
-        <span class="c1"># pyre-fixme[2]: Parameter annotation cannot be `Any`.</span>
-        <span class="n">additional_forward_args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">additional_forward_args</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">object</span><span class="p">],</span>
         <span class="n">n_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
         <span class="n">method</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
         <span class="n">internal_batch_size</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span>
-        <span class="c1"># pyre-fixme[31]: Expression `Literal[False]` is not a valid type.</span>
-        <span class="c1"># pyre-fixme[24]: Non-generic type `typing.Literal` cannot take parameters.</span>
         <span class="n">return_convergence_delta</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="kc">False</span><span class="p">],</span>
         <span class="n">attribute_to_layer_input</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+        <span class="n">grad_kwargs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">]]]]:</span> <span class="o">...</span>
 
     <span class="nd">@overload</span>
-    <span class="c1"># pyre-fixme[43]: The implementation of `attribute` does not accept all possible</span>
-    <span class="c1">#  arguments of overload defined on line `126`.</span>
-    <span class="k">def</span> <span class="nf">attribute</span><span class="p">(</span>
+    <span class="nd">@log_usage</span><span class="p">(</span><span class="n">part_of_slo</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">attribute</span><span class="p">(</span>  <span class="c1"># type: ignore</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">inputs</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span>
         <span class="n">baselines</span><span class="p">:</span> <span class="n">BaselineType</span><span class="p">,</span>
         <span class="n">target</span><span class="p">:</span> <span class="n">TargetType</span><span class="p">,</span>
-        <span class="n">additional_forward_args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">additional_forward_args</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">object</span><span class="p">],</span>
         <span class="n">n_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
         <span class="n">method</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
         <span class="n">internal_batch_size</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span>
-        <span class="c1"># pyre-fixme[31]: Expression `Literal[True]` is not a valid type.</span>
-        <span class="c1"># pyre-fixme[24]: Non-generic type `typing.Literal` cannot take parameters.</span>
         <span class="n">return_convergence_delta</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="kc">True</span><span class="p">],</span>
         <span class="n">attribute_to_layer_input</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+        <span class="n">grad_kwargs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span>
         <span class="n">Union</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">]]]],</span>
         <span class="n">Tensor</span><span class="p">,</span>
     <span class="p">]:</span> <span class="o">...</span>
 
     <span class="nd">@overload</span>
-    <span class="c1"># pyre-fixme[43]: This definition does not have the same decorators as the</span>
-    <span class="c1">#  preceding overload(s).</span>
+    <span class="nd">@log_usage</span><span class="p">(</span><span class="n">part_of_slo</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="k">def</span> <span class="nf">attribute</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">inputs</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span>
         <span class="n">baselines</span><span class="p">:</span> <span class="n">BaselineType</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">target</span><span class="p">:</span> <span class="n">TargetType</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">additional_forward_args</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">additional_forward_args</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">object</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">n_steps</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">50</span><span class="p">,</span>
         <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"gausslegendre"</span><span class="p">,</span>
         <span class="n">internal_batch_size</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">return_convergence_delta</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">attribute_to_layer_input</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">grad_kwargs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span>
         <span class="n">Union</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">]]]],</span>
         <span class="n">Tuple</span><span class="p">[</span>
@@ -207,20 +327,19 @@ src="/_sphinx/documentation_options.js"></script>
 
 <div class="viewcode-block" id="LayerIntegratedGradients.attribute">
 <a class="viewcode-back" href="../../../../../layer.html#captum.attr.LayerIntegratedGradients.attribute">[docs]</a>
-    <span class="nd">@log_usage</span><span class="p">()</span>
-    <span class="c1"># pyre-fixme[43]: This definition does not have the same decorators as the</span>
-    <span class="c1">#  preceding overload(s).</span>
+    <span class="nd">@log_usage</span><span class="p">(</span><span class="n">part_of_slo</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="k">def</span> <span class="nf">attribute</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">inputs</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span>
         <span class="n">baselines</span><span class="p">:</span> <span class="n">BaselineType</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">target</span><span class="p">:</span> <span class="n">TargetType</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">additional_forward_args</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">additional_forward_args</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">object</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">n_steps</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">50</span><span class="p">,</span>
         <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"gausslegendre"</span><span class="p">,</span>
         <span class="n">internal_batch_size</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">return_convergence_delta</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">attribute_to_layer_input</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">grad_kwargs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span>
         <span class="n">Union</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">]]]],</span>
         <span class="n">Tuple</span><span class="p">[</span>
@@ -356,6 +475,9 @@ src="/_sphinx/documentation_options.js"></script>
 <span class="sd">                        attribute to the input or output, is a single tensor.</span>
 <span class="sd">                        Support for multiple tensors will be added later.</span>
 <span class="sd">                        Default: False</span>
+<span class="sd">            grad_kwargs (Dict[str, Any], optional): Additional keyword</span>
+<span class="sd">                        arguments for torch.autograd.grad.</span>
+<span class="sd">                        Default: None</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            **attributions** or 2-element tuple of **attributions**, **delta**:</span>
@@ -410,11 +532,22 @@ src="/_sphinx/documentation_options.js"></script>
             <span class="n">additional_forward_args</span>
         <span class="p">)</span>
 
-        <span class="c1"># pyre-fixme[3]: Return type must be annotated.</span>
-        <span class="c1"># pyre-fixme[2]: Parameter must be annotated.</span>
-        <span class="k">def</span> <span class="nf">flatten_tuple</span><span class="p">(</span><span class="n">tup</span><span class="p">):</span>
+        <span class="k">def</span> <span class="nf">flatten_tuple</span><span class="p">(</span><span class="n">tup</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">]])</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
             <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span>
-                <span class="nb">sum</span><span class="p">((</span><span class="nb">list</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="p">(</span><span class="nb">tuple</span><span class="p">,</span> <span class="nb">list</span><span class="p">))</span> <span class="k">else</span> <span class="p">[</span><span class="n">x</span><span class="p">]</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">tup</span><span class="p">),</span> <span class="p">[])</span>
+                <span class="n">cast</span><span class="p">(</span>
+                    <span class="n">List</span><span class="p">[</span><span class="n">Tensor</span><span class="p">],</span>
+                    <span class="nb">sum</span><span class="p">(</span>
+                        <span class="p">(</span>
+                            <span class="p">(</span>
+                                <span class="nb">list</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+                                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="p">(</span><span class="nb">tuple</span><span class="p">,</span> <span class="nb">list</span><span class="p">))</span>
+                                <span class="k">else</span> <span class="n">cast</span><span class="p">(</span><span class="n">List</span><span class="p">[</span><span class="n">Tensor</span><span class="p">],</span> <span class="p">[</span><span class="n">x</span><span class="p">])</span>
+                            <span class="p">)</span>
+                            <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">tup</span>
+                        <span class="p">),</span>
+                        <span class="p">[],</span>
+                    <span class="p">),</span>
+                <span class="p">)</span>
             <span class="p">)</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">device_ids</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -428,16 +561,18 @@ src="/_sphinx/documentation_options.js"></script>
             <span class="n">additional_forward_args</span><span class="o">=</span><span class="n">additional_forward_args</span><span class="p">,</span>
             <span class="n">attribute_to_layer_input</span><span class="o">=</span><span class="n">attribute_to_layer_input</span><span class="p">,</span>
         <span class="p">)</span>
-
+        <span class="n">input_layer_list</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span>
         <span class="c1"># if we have one output</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">layer</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
-            <span class="n">inputs_layer</span> <span class="o">=</span> <span class="p">(</span><span class="n">inputs_layer</span><span class="p">,)</span>
+            <span class="n">input_layer_list</span> <span class="o">=</span> <span class="p">[</span><span class="n">cast</span><span class="p">(</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">inputs_layer</span><span class="p">)]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">input_layer_list</span> <span class="o">=</span> <span class="n">inputs_layer</span>
 
-        <span class="n">num_outputs</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">)</span> <span class="k">else</span> <span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">inputs_layer</span><span class="p">]</span>
+        <span class="n">num_outputs</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">)</span> <span class="k">else</span> <span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">input_layer_list</span><span class="p">]</span>
         <span class="n">num_outputs_cumsum</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span>
             <span class="n">torch</span><span class="o">.</span><span class="n">IntTensor</span><span class="p">([</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">num_outputs</span><span class="p">),</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span>  <span class="c1"># type: ignore</span>
         <span class="p">)</span>
-        <span class="n">inputs_layer</span> <span class="o">=</span> <span class="n">flatten_tuple</span><span class="p">(</span><span class="n">inputs_layer</span><span class="p">)</span>
+        <span class="n">inputs_layer</span> <span class="o">=</span> <span class="n">flatten_tuple</span><span class="p">(</span><span class="n">input_layer_list</span><span class="p">)</span>
 
         <span class="n">baselines_layer</span> <span class="o">=</span> <span class="n">_forward_layer_eval</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">forward_func</span><span class="p">,</span>
@@ -450,116 +585,10 @@ src="/_sphinx/documentation_options.js"></script>
         <span class="n">baselines_layer</span> <span class="o">=</span> <span class="n">flatten_tuple</span><span class="p">(</span><span class="n">baselines_layer</span><span class="p">)</span>
 
         <span class="c1"># inputs -&gt; these inputs are scaled</span>
-        <span class="k">def</span> <span class="nf">gradient_func</span><span class="p">(</span>
-            <span class="c1"># pyre-fixme[24]: Generic type `Callable` expects 2 type parameters.</span>
-            <span class="n">forward_fn</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
-            <span class="n">inputs</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span>
-            <span class="n">target_ind</span><span class="p">:</span> <span class="n">TargetType</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-            <span class="c1"># pyre-fixme[2]: Parameter annotation cannot be `Any`.</span>
-            <span class="n">additional_forward_args</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">device_ids</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">device_ids</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-                <span class="n">scattered_inputs</span> <span class="o">=</span> <span class="p">(</span><span class="n">inputs</span><span class="p">,)</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="c1"># scatter method does not have a precise enough return type in its</span>
-                <span class="c1"># stub, so suppress the type warning.</span>
-                <span class="n">scattered_inputs</span> <span class="o">=</span> <span class="n">scatter</span><span class="p">(</span>  <span class="c1"># type:ignore</span>
-                    <span class="c1"># pyre-fixme[6]: For 1st argument expected `Tensor` but got</span>
-                    <span class="c1">#  `Union[Tensor, typing.Tuple[Tensor, ...]]`.</span>
-                    <span class="n">inputs</span><span class="p">,</span>
-                    <span class="n">target_gpus</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">device_ids</span><span class="p">,</span>
-                <span class="p">)</span>
 
-            <span class="n">scattered_inputs_dict</span> <span class="o">=</span> <span class="p">{</span>
-                <span class="n">scattered_input</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">device</span><span class="p">:</span> <span class="n">scattered_input</span>
-                <span class="k">for</span> <span class="n">scattered_input</span> <span class="ow">in</span> <span class="n">scattered_inputs</span>
-            <span class="p">}</span>
-
-            <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">autograd</span><span class="o">.</span><span class="n">set_grad_enabled</span><span class="p">(</span><span class="kc">True</span><span class="p">):</span>
-
-                <span class="c1"># pyre-fixme[53]: Captured variable `num_outputs_cumsum` is not</span>
-                <span class="c1">#  annotated.</span>
-                <span class="c1"># pyre-fixme[53]: Captured variable `scattered_inputs_dict` is not</span>
-                <span class="c1">#  annotated.</span>
-                <span class="c1"># pyre-fixme[3]: Return type must be annotated.</span>
-                <span class="k">def</span> <span class="nf">layer_forward_hook</span><span class="p">(</span>
-                    <span class="c1"># pyre-fixme[2]: Parameter must be annotated.</span>
-                    <span class="n">module</span><span class="p">,</span>
-                    <span class="c1"># pyre-fixme[2]: Parameter must be annotated.</span>
-                    <span class="n">hook_inputs</span><span class="p">,</span>
-                    <span class="c1"># pyre-fixme[2]: Parameter must be annotated.</span>
-                    <span class="n">hook_outputs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-                    <span class="c1"># pyre-fixme[2]: Parameter must be annotated.</span>
-                    <span class="n">layer_idx</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
-                <span class="p">):</span>
-                    <span class="n">device</span> <span class="o">=</span> <span class="n">_extract_device</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">hook_inputs</span><span class="p">,</span> <span class="n">hook_outputs</span><span class="p">)</span>
-                    <span class="n">is_layer_tuple</span> <span class="o">=</span> <span class="p">(</span>
-                        <span class="nb">isinstance</span><span class="p">(</span><span class="n">hook_outputs</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span>
-                        <span class="c1"># hook_outputs is None if attribute_to_layer_input == True</span>
-                        <span class="k">if</span> <span class="n">hook_outputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-                        <span class="k">else</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">hook_inputs</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span>
-                    <span class="p">)</span>
-
-                    <span class="k">if</span> <span class="n">is_layer_tuple</span><span class="p">:</span>
-                        <span class="k">return</span> <span class="n">scattered_inputs_dict</span><span class="p">[</span><span class="n">device</span><span class="p">][</span>
-                            <span class="n">num_outputs_cumsum</span><span class="p">[</span><span class="n">layer_idx</span><span class="p">]</span> <span class="p">:</span> <span class="n">num_outputs_cumsum</span><span class="p">[</span>
-                                <span class="n">layer_idx</span> <span class="o">+</span> <span class="mi">1</span>
-                            <span class="p">]</span>
-                        <span class="p">]</span>
-
-                    <span class="k">return</span> <span class="n">scattered_inputs_dict</span><span class="p">[</span><span class="n">device</span><span class="p">][</span><span class="n">num_outputs_cumsum</span><span class="p">[</span><span class="n">layer_idx</span><span class="p">]]</span>
-
-                <span class="n">hooks</span> <span class="o">=</span> <span class="p">[]</span>
-                <span class="k">try</span><span class="p">:</span>
-
-                    <span class="n">layers</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">layer</span>
-                    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">layers</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
-                        <span class="n">layers</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">layer</span><span class="p">]</span>
-
-                    <span class="k">for</span> <span class="n">layer_idx</span><span class="p">,</span> <span class="n">layer</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">layers</span><span class="p">):</span>
-                        <span class="n">hook</span> <span class="o">=</span> <span class="kc">None</span>
-                        <span class="c1"># TODO:</span>
-                        <span class="c1"># Allow multiple attribute_to_layer_input flags for</span>
-                        <span class="c1"># each layer, i.e. attribute_to_layer_input[layer_idx]</span>
-                        <span class="k">if</span> <span class="n">attribute_to_layer_input</span><span class="p">:</span>
-                            <span class="n">hook</span> <span class="o">=</span> <span class="n">layer</span><span class="o">.</span><span class="n">register_forward_pre_hook</span><span class="p">(</span>
-                                <span class="n">functools</span><span class="o">.</span><span class="n">partial</span><span class="p">(</span>
-                                    <span class="n">layer_forward_hook</span><span class="p">,</span> <span class="n">layer_idx</span><span class="o">=</span><span class="n">layer_idx</span>
-                                <span class="p">)</span>
-                            <span class="p">)</span>
-                        <span class="k">else</span><span class="p">:</span>
-                            <span class="n">hook</span> <span class="o">=</span> <span class="n">layer</span><span class="o">.</span><span class="n">register_forward_hook</span><span class="p">(</span>
-                                <span class="n">functools</span><span class="o">.</span><span class="n">partial</span><span class="p">(</span>
-                                    <span class="n">layer_forward_hook</span><span class="p">,</span> <span class="n">layer_idx</span><span class="o">=</span><span class="n">layer_idx</span>
-                                <span class="p">)</span>
-                            <span class="p">)</span>
-
-                        <span class="n">hooks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">hook</span><span class="p">)</span>
-
-                    <span class="c1"># the inputs is an empty tuple</span>
-                    <span class="c1"># coz it is prepended into additional_forward_args</span>
-                    <span class="n">output</span> <span class="o">=</span> <span class="n">_run_forward</span><span class="p">(</span>
-                        <span class="bp">self</span><span class="o">.</span><span class="n">forward_func</span><span class="p">,</span> <span class="p">(),</span> <span class="n">target_ind</span><span class="p">,</span> <span class="n">additional_forward_args</span>
-                    <span class="p">)</span>
-                <span class="k">finally</span><span class="p">:</span>
-                    <span class="k">for</span> <span class="n">hook</span> <span class="ow">in</span> <span class="n">hooks</span><span class="p">:</span>
-                        <span class="k">if</span> <span class="n">hook</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-                            <span class="n">hook</span><span class="o">.</span><span class="n">remove</span><span class="p">()</span>
-
-                <span class="c1"># _run_forward may return future of Tensor,</span>
-                <span class="c1"># but we don't support it here now</span>
-                <span class="c1"># And it will fail before here.</span>
-                <span class="n">output</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">output</span><span class="p">)</span>
-                <span class="k">assert</span> <span class="n">output</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span> <span class="o">==</span> <span class="mi">1</span><span class="p">,</span> <span class="p">(</span>
-                    <span class="s2">"Target not provided when necessary, cannot"</span>
-                    <span class="s2">" take gradient with respect to multiple outputs."</span>
-                <span class="p">)</span>
-                <span class="c1"># torch.unbind(forward_out) is a list of scalar tensor tuples and</span>
-                <span class="c1"># contains batch_size * #steps elements</span>
-                <span class="n">grads</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">autograd</span><span class="o">.</span><span class="n">grad</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">unbind</span><span class="p">(</span><span class="n">output</span><span class="p">),</span> <span class="n">inputs</span><span class="p">)</span>
-            <span class="k">return</span> <span class="n">grads</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">ig</span><span class="o">.</span><span class="n">gradient_func</span> <span class="o">=</span> <span class="n">gradient_func</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ig</span><span class="o">.</span><span class="n">gradient_func</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_make_gradient_func</span><span class="p">(</span>
+            <span class="n">num_outputs_cumsum</span><span class="p">,</span> <span class="n">attribute_to_layer_input</span><span class="p">,</span> <span class="n">grad_kwargs</span>
+        <span class="p">)</span>
         <span class="n">all_inputs</span> <span class="o">=</span> <span class="p">(</span>
             <span class="p">(</span><span class="n">inps</span> <span class="o">+</span> <span class="n">additional_forward_args</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">additional_forward_args</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
@@ -609,8 +638,7 @@ src="/_sphinx/documentation_options.js"></script>
 
 
     <span class="nd">@property</span>
-    <span class="c1"># pyre-fixme[3]: Return type must be annotated.</span>
-    <span class="k">def</span> <span class="nf">multiplies_by_inputs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">multiplies_by_inputs</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ig</span><span class="o">.</span><span class="n">multiplies_by_inputs</span></div>
 
 </pre></div>
@@ -661,7 +689,7 @@ src="/_sphinx/documentation_options.js"></script>
 </div>
 </div>
 <div class="clearer"></div>
-</div></div></div><footer class="nav-footer" id="footer"><section class="sitemap"><div class="footerSection"><h5>Docs</h5><a href="/docs/introduction">Introduction</a><a href="/docs/getting_started">Getting Started</a><a href="/tutorials/">Tutorials</a><a href="/api/">API Reference</a></div><div class="footerSection"><h5>Legal</h5><a href="https://opensource.facebook.com/legal/privacy/" target="_blank" rel="noreferrer noopener">Privacy</a><a href="https://opensource.facebook.com/legal/terms/" target="_blank" rel="noreferrer noopener">Terms</a></div><div class="footerSection"><h5>Social</h5><div class="social"><a class="github-button" href="https://github.com/pytorch/captum" data-count-href="https://github.com/pytorch/captum/stargazers" data-show-count="true" data-count-aria-label="# stargazers on GitHub" aria-label="Star Captum on GitHub">captum</a></div></div></section><a href="https://opensource.facebook.com/" target="_blank" rel="noreferrer noopener" class="fbOpenSource"><img src="/img/oss_logo.png" alt="Facebook Open Source" width="170" height="45"/></a><section class="copyright"> Copyright © 2024 Facebook Inc.</section><script>
+</div></div></div><footer class="nav-footer" id="footer"><section class="sitemap"><div class="footerSection"><h5>Docs</h5><a href="/docs/introduction">Introduction</a><a href="/docs/getting_started">Getting Started</a><a href="/tutorials/">Tutorials</a><a href="/api/">API Reference</a></div><div class="footerSection"><h5>Legal</h5><a href="https://opensource.facebook.com/legal/privacy/" target="_blank" rel="noreferrer noopener">Privacy</a><a href="https://opensource.facebook.com/legal/terms/" target="_blank" rel="noreferrer noopener">Terms</a></div><div class="footerSection"><h5>Social</h5><div class="social"><a class="github-button" href="https://github.com/pytorch/captum" data-count-href="https://github.com/pytorch/captum/stargazers" data-show-count="true" data-count-aria-label="# stargazers on GitHub" aria-label="Star Captum on GitHub">captum</a></div></div></section><a href="https://opensource.facebook.com/" target="_blank" rel="noreferrer noopener" class="fbOpenSource"><img src="/img/oss_logo.png" alt="Facebook Open Source" width="170" height="45"/></a><section class="copyright"> Copyright © 2025 Facebook Inc.</section><script>
             (function() {
               var BAD_BASE = '/captum/';
               if (window.location.origin !== 'https://captum.ai') {

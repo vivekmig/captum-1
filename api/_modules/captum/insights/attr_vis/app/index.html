@@ -38,6 +38,7 @@ src="/_sphinx/documentation_options.js"></script>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="p">(</span>
     <span class="n">Any</span><span class="p">,</span>
     <span class="n">Callable</span><span class="p">,</span>
+    <span class="n">cast</span><span class="p">,</span>
     <span class="n">Dict</span><span class="p">,</span>
     <span class="n">Iterable</span><span class="p">,</span>
     <span class="n">List</span><span class="p">,</span>
@@ -113,16 +114,10 @@ src="/_sphinx/documentation_options.js"></script>
     <span class="k">return</span> <span class="n">_CONTEXT_NONE</span>
 
 
-<span class="c1"># pyre-fixme[4]: Attribute annotation cannot be `Any`.</span>
-<span class="c1"># pyre-fixme[2]: Parameter annotation cannot be `Any`.</span>
 <span class="n">VisualizationOutput</span> <span class="o">=</span> <span class="n">namedtuple</span><span class="p">(</span>
     <span class="s2">"VisualizationOutput"</span><span class="p">,</span> <span class="s2">"feature_outputs actual predicted active_index model_index"</span>
 <span class="p">)</span>
-<span class="c1"># pyre-fixme[4]: Attribute annotation cannot be `Any`.</span>
-<span class="c1"># pyre-fixme[2]: Parameter annotation cannot be `Any`.</span>
 <span class="n">Contribution</span> <span class="o">=</span> <span class="n">namedtuple</span><span class="p">(</span><span class="s2">"Contribution"</span><span class="p">,</span> <span class="s2">"name percent"</span><span class="p">)</span>
-<span class="c1"># pyre-fixme[4]: Attribute annotation cannot be `Any`.</span>
-<span class="c1"># pyre-fixme[2]: Parameter annotation cannot be `Any`.</span>
 <span class="n">SampleCache</span> <span class="o">=</span> <span class="n">namedtuple</span><span class="p">(</span><span class="s2">"SampleCache"</span><span class="p">,</span> <span class="s2">"inputs additional_forward_args label"</span><span class="p">)</span>
 
 
@@ -280,7 +275,7 @@ src="/_sphinx/documentation_options.js"></script>
             <span class="n">num_examples</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
         <span class="p">)</span>
 
-    <span class="nd">@log_usage</span><span class="p">()</span>
+    <span class="nd">@log_usage</span><span class="p">(</span><span class="n">part_of_slo</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
     <span class="k">def</span> <span class="nf">render</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="kn">from</span> <span class="nn">captum.insights.attr_vis.widget.widget</span> <span class="kn">import</span> <span class="n">CaptumInsights</span>
         <span class="kn">from</span> <span class="nn">IPython.display</span> <span class="kn">import</span> <span class="n">display</span>
@@ -290,7 +285,7 @@ src="/_sphinx/documentation_options.js"></script>
         <span class="k">if</span> <span class="n">debug</span><span class="p">:</span>
             <span class="n">display</span><span class="p">(</span><span class="n">widget</span><span class="o">.</span><span class="n">out</span><span class="p">)</span>
 
-    <span class="nd">@log_usage</span><span class="p">()</span>
+    <span class="nd">@log_usage</span><span class="p">(</span><span class="n">part_of_slo</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
     <span class="c1"># pyre-fixme[3]: Return type must be annotated.</span>
     <span class="k">def</span> <span class="nf">serve</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -438,10 +433,10 @@ src="/_sphinx/documentation_options.js"></script>
         <span class="n">single_model_index</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">VisualizationOutput</span><span class="p">]]:</span>
         <span class="c1"># Use all models, unless the user wants to render data for a particular one</span>
-        <span class="n">models_used</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">models_used</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Module</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
             <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">models</span><span class="p">[</span><span class="n">single_model_index</span><span class="p">]]</span>
             <span class="k">if</span> <span class="n">single_model_index</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-            <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">models</span>
+            <span class="k">else</span> <span class="n">cast</span><span class="p">(</span><span class="n">List</span><span class="p">[</span><span class="n">Module</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">models</span><span class="p">)</span>
         <span class="p">)</span>
         <span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">model_index</span><span class="p">,</span> <span class="n">model</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">models_used</span><span class="p">):</span>
@@ -564,7 +559,7 @@ src="/_sphinx/documentation_options.js"></script>
 
         <span class="k">return</span> <span class="n">vis_outputs</span>
 
-    <span class="nd">@log_usage</span><span class="p">()</span>
+    <span class="nd">@log_usage</span><span class="p">(</span><span class="n">part_of_slo</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
     <span class="c1"># pyre-fixme[3]: Return type must be annotated.</span>
     <span class="k">def</span> <span class="nf">visualize</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_outputs</span> <span class="o">=</span> <span class="p">[]</span>
@@ -633,7 +628,7 @@ src="/_sphinx/documentation_options.js"></script>
 </div>
 </div>
 <div class="clearer"></div>
-</div></div></div><footer class="nav-footer" id="footer"><section class="sitemap"><div class="footerSection"><h5>Docs</h5><a href="/docs/introduction">Introduction</a><a href="/docs/getting_started">Getting Started</a><a href="/tutorials/">Tutorials</a><a href="/api/">API Reference</a></div><div class="footerSection"><h5>Legal</h5><a href="https://opensource.facebook.com/legal/privacy/" target="_blank" rel="noreferrer noopener">Privacy</a><a href="https://opensource.facebook.com/legal/terms/" target="_blank" rel="noreferrer noopener">Terms</a></div><div class="footerSection"><h5>Social</h5><div class="social"><a class="github-button" href="https://github.com/pytorch/captum" data-count-href="https://github.com/pytorch/captum/stargazers" data-show-count="true" data-count-aria-label="# stargazers on GitHub" aria-label="Star Captum on GitHub">captum</a></div></div></section><a href="https://opensource.facebook.com/" target="_blank" rel="noreferrer noopener" class="fbOpenSource"><img src="/img/oss_logo.png" alt="Facebook Open Source" width="170" height="45"/></a><section class="copyright"> Copyright © 2024 Facebook Inc.</section><script>
+</div></div></div><footer class="nav-footer" id="footer"><section class="sitemap"><div class="footerSection"><h5>Docs</h5><a href="/docs/introduction">Introduction</a><a href="/docs/getting_started">Getting Started</a><a href="/tutorials/">Tutorials</a><a href="/api/">API Reference</a></div><div class="footerSection"><h5>Legal</h5><a href="https://opensource.facebook.com/legal/privacy/" target="_blank" rel="noreferrer noopener">Privacy</a><a href="https://opensource.facebook.com/legal/terms/" target="_blank" rel="noreferrer noopener">Terms</a></div><div class="footerSection"><h5>Social</h5><div class="social"><a class="github-button" href="https://github.com/pytorch/captum" data-count-href="https://github.com/pytorch/captum/stargazers" data-show-count="true" data-count-aria-label="# stargazers on GitHub" aria-label="Star Captum on GitHub">captum</a></div></div></section><a href="https://opensource.facebook.com/" target="_blank" rel="noreferrer noopener" class="fbOpenSource"><img src="/img/oss_logo.png" alt="Facebook Open Source" width="170" height="45"/></a><section class="copyright"> Copyright © 2025 Facebook Inc.</section><script>
             (function() {
               var BAD_BASE = '/captum/';
               if (window.location.origin !== 'https://captum.ai') {

@@ -5,13 +5,13 @@
 
 # This notebook tutorial demonstrates how feature ablation in Captum can be applied to inspect computer vision models. 
 # 
-# **Task:** Classification into ImageNet-1k categories
+# **Task:** Classification into ImageNet-1k categories.
 # 
-# **Model:** A ResNet18 trained on ImageNet-1k
+# **Model:** A ResNet18 trained on ImageNet-1k.
 # 
-# **Data to inspect:** Samples from PASCAL VOC 2012
+# **Data to inspect:** Samples from PASCAL VOC (Visual Object Classes) 2012.
 # 
-# **Ablation based on:** Segmentation masks
+# **Ablation based on:** Segmentation masks.
 # 
 # We will use the visualization functions in Captum to show how each semantic part impacts the model output.
 #   
@@ -49,18 +49,18 @@ import json
 resnet = models.resnet18(pretrained=True)
 resnet = resnet.eval()
 
-
 # A straightforward way to demonstrate feature ablation on images is to ablate semantic image areas.
 # 
-# Therefore, we will load sample images from PASCAL VOC, as these images come along with annotated segmentation masks.
+# Therefore, we will load sample images from VOC 2012, as these images come along with annotated segmentation masks.
 # 
-# **Note**: The VOC dataset is 2GB. If you do not want to download it, you can skip the next step and provide your own image and segmentation mask in the step next.
+# **Note**: The VOC 2012 dataset is 2GB. If you do not want to download it, you can skip the next step and provide your own image and segmentation mask in the step next.
 
 # In[3]:
 
 
 root = "./VOC"
 dataset = torchvision.datasets.VOCSegmentation(root, year='2012', image_set='train', download=False, transform=None, target_transform=None)
+
 
 
 # Let us look at a sample image along with its segmentation mask:
@@ -76,17 +76,17 @@ mask_img = Image.open(dataset.masks[sample_ind])
 plt.imshow(mask_img); plt.axis('off'); plt.show()
 
 
-# According to the segmentation mask, the image contains three bottles, and two TV monitors, with the rest considered background. All of `background`, `bottle`, and `tvmonitor` are among the 20 categories in PASCAL VOC 2012. This dataset also features a `void` category, used to annotate pixels that are not considered part of any class. These pixels represent border between the objects in the above example.
+
+# According to the segmentation mask, the image contains three bottles, and two TV monitors, with the rest considered background. All of `background`, `bottle`, and `tvmonitor` are among the 20 categories in VOC 2012. This dataset also features a `void` category, used to annotate pixels that are not considered part of any class. These pixels represent border between the objects in the above example.
 
 # Let us also load ImageNet class labels to understand the output when we classify the samples using a classifier trained on ImageNet-1k.
 # 
-# **Note**: wget should be available as a command in your environment. You might need to install it. You can skip the next two steps if you are OK with class index as classification output (in that case, use `classify` in the next sections with `print_result`=`False`). 
+# **Note**: wget should be available as a command in your environment, although you might need to install it. You can skip the next two steps if you are OK with class index as classification output (in that case, use `classify` in the next sections with `print_result`=`False`). 
 
 # In[5]:
 
 
-get_ipython().system('wget -P $HOME/.torch/models https://s3.amazonaws.com/deep-learning-models/image-models/imagenet_class_index.json')
-
+!wget -P $HOME/.torch/models https://s3.amazonaws.com/deep-learning-models/image-models/imagenet_class_index.json
 
 # In[6]:
 
@@ -94,7 +94,6 @@ get_ipython().system('wget -P $HOME/.torch/models https://s3.amazonaws.com/deep-
 labels_path = os.getenv("HOME") + '/.torch/models/imagenet_class_index.json'
 with open(labels_path) as json_data:
     idx_to_labels = json.load(json_data)
-
 
 # ## 2. Baseline classification
 
@@ -128,13 +127,13 @@ def classify(img, print_result=True):
 
 
 
+
 # Now, let us classify the image we loaded in the previous section:
 
 # In[26]:
 
 
 predicted_class, prediction_score = classify(img)
-
 
 # Our model classifies the image as the ImageNet-1k category `wine_bottle`. Not bad.
 # 
@@ -161,6 +160,7 @@ predicted_class, prediction_score = classify(img)
 feature_mask = np.array(mask_img.getdata()).reshape(1, 1, mask_img.size[1], mask_img.size[0])
 
 
+
 # Our `feature_mask` is basically ready to use. However, let us first check its unique values that define the group ids:
 
 # In[10]:
@@ -168,8 +168,7 @@ feature_mask = np.array(mask_img.getdata()).reshape(1, 1, mask_img.size[1], mask
 
 print(np.unique(feature_mask))
 
-
-# These ids correspond to the VOC labels for `background`, `bottle`, `tvmonitor` and `void`.
+# These ids correspond to the VOC 2012 labels for `background`, `bottle`, `tvmonitor` and `void`.
 # 
 # While they would work, Captum expects consecutive group ids and would hence consider that there are 256 feature groups (most of them empty). This would result in slow execution.
 # 
@@ -196,7 +195,6 @@ attribution_map = ablator.attribute(
     target=predicted_class,
     feature_mask=torch.tensor(feature_mask))
 
-
 # Let us visualize the resulting attribution map:
 
 # In[13]:
@@ -209,6 +207,7 @@ _ = viz.visualize_image_attr(attribution_map,
                              method="heat_map",
                              sign="all",
                              show_colorbar=True)
+
 
 
 # Captum has computed the influence of each feature groups on the predicted label `wine_bottle`:
@@ -234,12 +233,13 @@ attribution_map = ablator.attribute(
 
 attribution_map = attribution_map.squeeze().cpu().detach().numpy()
 # adjust shape to height, width, channels 
-attribution_map = np.transpose(attribution_map,  (1,2,0))
+attribution_map = np.transpose(attribution_map, (1,2,0))
 
 _ = viz.visualize_image_attr(attribution_map,
                              method="heat_map",
                              sign="all",
                              show_colorbar=True)
+
 
 
 
@@ -279,7 +279,6 @@ plt.imshow(img_without_bottles); plt.axis('off'); plt.show()
 
 classify(img_without_bottles)
 
-
 # The output is `desktop_computer`, another class in ImageNet whose images usuallly include a monitor and a keyboard. Not bad.
 # 
 # In fact, the `monitor` class (with id = 664) is among the top-5 guesses:
@@ -290,4 +289,3 @@ classify(img_without_bottles)
 output = resnet(img_to_resnet_input(img_without_bottles).unsqueeze(0))
 output = F.softmax(output, dim=1)
 torch.topk(output, 5)
-
