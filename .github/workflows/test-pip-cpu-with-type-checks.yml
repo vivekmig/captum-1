@@ -1,4 +1,4 @@
-name: Unit-tests for Pip install with type checks
+name: Unit-tests for Conda install
 
 on:
   pull_request:
@@ -8,22 +8,33 @@ on:
 
   workflow_dispatch:
 
+env:
+  CHANNEL: "nightly"
+
 jobs:
   tests:
     strategy:
       matrix:
-        pytorch_args: ["", "-n"]
+        python_version: ["3.10", "3.11", "3.12"]
       fail-fast: false
-    uses: pytorch/test-infra/.github/workflows/linux_job_v2.yml@main
+    uses: pytorch/test-infra/.github/workflows/linux_job.yml@main
     with:
       runner: linux.12xlarge
-      docker-image: cimg/python:3.11
       repository: pytorch/captum
       script: |
-        sudo chmod -R 777 .
-        ./scripts/install_via_pip.sh ${{ matrix.pytorch_args }}
-        ./scripts/run_mypy.sh
+        # Set up Environment Variables
+        export PYTHON_VERSION="${{ matrix.python_version }}"
+
+        # Create Conda Env
+        conda create -yp ci_env python="${PYTHON_VERSION}"
+        conda activate /pytorch/captum/ci_env
+        ./scripts/install_via_conda.sh
+
+        # Run Tests
+        python3 -m pytest -ra --cov=. --cov-report term-missing
+
         # Disabling pyre check until numpy issues are resolved
         pyre check
+        ./scripts/run_mypy.sh
         # Run Tests
         python3 -m pytest -ra --cov=. --cov-report term-missing
