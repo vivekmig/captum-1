@@ -69,7 +69,7 @@ TEST_REQUIRES = [
     "black",
     "flake8",
     "mypy>=0.760",
-    "pyre-check-nightly==0.0.101750936314",
+    "pyre-check",
     "usort==1.0.2",
     "ufmt",
 ]
