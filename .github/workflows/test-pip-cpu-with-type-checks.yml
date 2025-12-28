@@ -24,6 +24,6 @@ jobs:
         ./scripts/install_via_pip.sh ${{ matrix.pytorch_args }}
         ./scripts/run_mypy.sh
         # Disabling pyre check until numpy issues are resolved
-        # pyre check
+        pyre check
         # Run Tests
         python3 -m pytest -ra --cov=. --cov-report term-missing

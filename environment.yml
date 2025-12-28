@@ -2,8 +2,8 @@ name: captum
 channels:
   - pytorch
 dependencies:
-  - numpy
-  - pytorch>=2.3
+  - numpy<2.0
+  - pytorch>=1.13
   - matplotlib-base
   - tqdm
   - packaging
